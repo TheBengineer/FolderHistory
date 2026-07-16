@@ -409,3 +409,89 @@ class TestPipelineOnDummyData:
             "Expected 1 modify on src/main.py between S0 and S1 (LF→CRLF), "
             f"got {len(main_modifies)}: {[op.op_type for op in s0_s1_ops]}"
         )
+
+    # ── Photo-curation pipeline ────────────────────────────────────────────
+
+    def test_photo_curation_pipeline(self, tmp_path: Path) -> None:
+        """Full pipeline on photo-curation scenario — verify copy ops and identity bridging."""
+        output_dir = generate(
+            scenario="photo-curation",
+            num_snapshots=7,
+            seed=42,
+            output_dir=tmp_path / "data",
+        )
+
+        # Ingest all snapshots
+        snapshots = _ingest_snapshots(output_dir)
+
+        # Run identity and diff
+        identities = assign_identities_exact(snapshots)
+        operations = derive_operations(snapshots, identities)
+
+        # Verify basic invariants
+        assert len(operations) > 0
+        assert len(operations) == len(snapshots) - 1
+
+        # Verify: copy operations exist (from pipeline diff, not just ground truth)
+        all_ops = [op for pair in operations for op in pair]
+        copy_ops = [op for op in all_ops if op.op_type == "copy"]
+        assert len(copy_ops) >= 1, (
+            f"Expected copy ops, got {len(copy_ops)}"
+        )
+
+        # Verify: identity clusters bridge curated files
+        # (same file_id across snapshots where content is identical)
+        for cluster in identities.values():
+            if len(cluster.observations) >= 2:
+                paths = {p for _, p in cluster.observations}
+                # Check that some clusters span both dated and curated paths
+                if any("hotrod" in p for p in paths) and any("2024" in p for p in paths):
+                    break
+        else:
+            pytest.fail("No identity cluster spans both dated and curated directories")
+
+    def test_photo_curation_ground_truth(self, tmp_path: Path) -> None:
+        """Verify photo-curation ground truth contains curation fields."""
+        output_dir = generate(
+            scenario="photo-curation",
+            num_snapshots=7,
+            seed=42,
+            output_dir=tmp_path / "data",
+        )
+
+        meta: dict[str, object] = cast(
+            "dict[str, object]",
+            json.loads((output_dir / ".meta.json").read_text()),
+        )
+
+        # Check project_roots
+        assert "project_roots" in meta
+
+        # Check curation_status and project_uid in files metadata
+        has_curated: bool = False
+        has_project_uid: bool = False
+        files_container: dict[str, object] = cast(
+            "dict[str, object]", meta.get("files", {}),
+        )
+        for _snap_id, snap_files_raw in files_container.items():
+            snap_files: dict[str, object] = cast("dict[str, object]", snap_files_raw)
+            for _path, file_info_raw in snap_files.items():
+                file_info: dict[str, object] = cast("dict[str, object]", file_info_raw)
+                if file_info.get("curation_status") == "curated":
+                    has_curated = True
+                if file_info.get("project_uid"):
+                    has_project_uid = True
+
+        assert has_curated, "No curated files found in ground truth"
+        assert has_project_uid, "No project_uid found in ground truth"
+
+        # Check curated_observations in identity clusters
+        identity_clusters_raw: object = meta.get("identity_clusters", [])
+        assert isinstance(identity_clusters_raw, list)
+        identity_clusters: list[dict[str, object]] = cast(
+            "list[dict[str, object]]", identity_clusters_raw,
+        )
+        has_curated_obs: bool = any(
+            c.get("curated_observations") for c in identity_clusters
+        )
+        assert has_curated_obs, "No curated_observations in identity clusters"

@@ -284,6 +284,11 @@ class TestScenarioOutput:
             )
             assert len(snapshots) == expected
 
+    def test_photo_curation_default_count(self) -> None:
+        """Photo-curation scenario has default count of 7."""
+        assert "photo-curation" in SCENARIO_DEFAULTS
+        assert SCENARIO_DEFAULTS["photo-curation"] == 7
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Ground truth correctness

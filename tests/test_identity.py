@@ -8,6 +8,7 @@ from folderhistory.core.identity import (
     DisjointSet,
     assign_identities_exact,
     assign_identities_with_blocking,
+    _identity_key,
 )
 from folderhistory.knowledge.json_kb import JSONKnowledgeBase
 from folderhistory.types import FileRecord, IdentityCluster, Snapshot
@@ -574,3 +575,67 @@ class TestAssignIdentitiesExactWithKB:
         assert len(clusters) == 1
         uid = next(iter(clusters.keys()))
         assert uid != "cluster_ghost"
+
+
+# ── project_uid scoping ─────────────────────────────────────────────────────
+
+
+class TestProjectUID:
+    """Tests for ``project_uid`` parameter in identity assignment."""
+
+    def test_project_uid_default(self) -> None:
+        """Default project_uid produces ``"default:path"`` identity keys."""
+        f = _make_file("a.txt", "hash_aaa")
+        snap = _make_snapshot("v1", f)
+
+        key = _identity_key("a.txt")
+        assert key == "default:a.txt"
+
+    def test_project_uid_custom(self) -> None:
+        """Custom project_uid produces ``"<uid>:path"`` identity keys."""
+        f = _make_file("a.txt", "hash_aaa")
+        snap = _make_snapshot("v1", f)
+
+        clusters = assign_identities_exact([snap], project_uid="project-a")
+        assert len(clusters) == 1
+        uid = next(iter(clusters.keys()))
+        assert uid.startswith("project-a:"), f"Expected UID to start with 'project-a:', got {uid!r}"
+
+    def test_project_uid_isolation(self) -> None:
+        """Two projects with same relative paths produce separate clusters."""
+        f_a = _make_file("src/main.py", "hash_abc")
+        f_b = _make_file("src/main.py", "hash_abc")
+
+        snap_a = _make_snapshot("v1", f_a)
+        snap_b = _make_snapshot("v1", f_b)
+
+        clusters_a = assign_identities_exact([snap_a], project_uid="project-a")
+        clusters_b = assign_identities_exact([snap_b], project_uid="project-b")
+
+        # Same relative path but different project_uid → different UIDs
+        assert len(clusters_a) == 1
+        assert len(clusters_b) == 1
+        uid_a = next(iter(clusters_a.keys()))
+        uid_b = next(iter(clusters_b.keys()))
+        assert uid_a != uid_b, "Separate projects should produce different cluster UIDs"
+        assert uid_a.startswith("project-a:")
+        assert uid_b.startswith("project-b:")
+
+    def test_project_uid_kb_pre_seed(self, tmp_path: Path) -> None:
+        """KB pre-seeding works with custom project_uid."""
+        kb_path = tmp_path / "test_kb.json"
+        kb = JSONKnowledgeBase(kb_path, schema_version=1)
+        kb.open()
+        kb.set_identity("hash_abc", "cluster_001", 1.0)
+
+        f = _make_file("a.txt", "hash_abc")
+        snap = _make_snapshot("v1", f)
+
+        clusters = assign_identities_exact([snap], kb=kb, project_uid="project-a")
+
+        assert len(clusters) == 1
+        assert "cluster_001" in clusters
+        cluster = clusters["cluster_001"]
+        assert ("v1", "a.txt") in cluster.observations
+        assert cluster.canonical_path == "a.txt"
+        assert cluster.confidence == 1.0

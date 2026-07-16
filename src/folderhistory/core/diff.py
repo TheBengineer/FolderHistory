@@ -114,6 +114,26 @@ def _file_record(
     return file_lookup.get((snap_id, path))
 
 
+def _find_source_path(
+    snap_a: Snapshot,
+    hash_value: str,
+    cluster_paths_in_a: set[str],
+) -> str | None:
+    """Find a path in *snap_a* whose file has the given raw_blake3.
+
+    Prefers paths that belong to the identity cluster (``cluster_paths_in_a``)
+    over files outside the cluster.  Returns ``None`` when no file in
+    *snap_a* has *hash_value*.
+    """
+    for fr in snap_a.files:
+        if fr.raw_blake3 == hash_value and fr.path in cluster_paths_in_a:
+            return fr.path
+    for fr in snap_a.files:
+        if fr.raw_blake3 == hash_value:
+            return fr.path
+    return None
+
+
 def _derive_ops_between(
     snap_a: Snapshot,
     snap_b: Snapshot,
@@ -176,6 +196,46 @@ def _derive_ops_between(
 
         rec_a = _file_record(file_lookup, snap_a.id, path_a)
         rec_b = _file_record(file_lookup, snap_b.id, path_b)
+
+        # ── Copy detection ─────────────────────────────────────────────────
+        # If the cluster has more observations in S_{i+1} than in S_i, some
+        # of those extra paths may be copies (same content hash) or new files
+        # (different content hash).
+        paths_a_set: set[str] = {p for _, p in obs_in_a}
+        paths_b_set: set[str] = {p for _, p in obs_in_b}
+        extra_in_b = (paths_b_set - paths_a_set) - {path_b}
+
+        if extra_in_b:
+            hashes_in_a: set[str] = {fr.raw_blake3 for fr in snap_a.files}
+
+            for new_path in sorted(extra_in_b):
+                rec_new = _file_record(file_lookup, snap_b.id, new_path)
+                if rec_new is None:
+                    continue
+
+                if rec_new.raw_blake3 in hashes_in_a:
+                    source_path = _find_source_path(snap_a, rec_new.raw_blake3, paths_a_set)
+                    ops.append(
+                        EditOperation(
+                            op_type="copy",
+                            file_id=source_path or new_path,
+                            source_path=source_path,
+                            target_path=new_path,
+                            old_hash=rec_new.raw_blake3,
+                            new_hash=rec_new.raw_blake3,
+                            confidence=1.0,
+                        ),
+                    )
+                else:
+                    ops.append(
+                        EditOperation(
+                            op_type="create",
+                            file_id=new_path,
+                            target_path=new_path,
+                            new_hash=rec_new.raw_blake3,
+                            confidence=1.0,
+                        ),
+                    )
 
         same_path = path_a == path_b
 

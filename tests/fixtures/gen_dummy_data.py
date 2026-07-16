@@ -71,6 +71,8 @@ class _TrackedFile:
     mode: int
     is_symlink: bool = False
     target_path: str | None = None
+    project_uid: str = ""  # empty = single-project mode
+    curation_status: str | None = None  # "curated" | "original" | "duplicate" | None
 
 
 class _SnapshotState:
@@ -103,6 +105,7 @@ class _GeneratorState:
         self.scenario: str = ""
         self.snapshot_names: list[str] = []
         self.source_paths: list[str] | None = None
+        self.project_roots: dict[str, str] = {}
 
 
 # ── Content utilities ────────────────────────────────────────────────────────

@@ -525,3 +525,126 @@ class TestDeriveOperations:
         assert len(ops_list[1]) == 1
         assert ops_list[1][0].op_type == "delete"
         assert ops_list[1][0].source_path == "temp.txt"
+
+
+# ── Copy operations ─────────────────────────────────────────────────────────
+
+
+class TestCopyOperations:
+    """Tests for copy operation detection in :func:`derive_operations_between`."""
+
+    def test_copy_file(self) -> None:
+        """Identity has 1 obs in S_i, 2 obs in S_{i+1} (one shared + one new
+        with same hash) → 1 copy op.
+        """
+        f_orig = _make_file("original.txt", "hash_abc")
+        f_copy = _make_file("copy.txt", "hash_abc")
+        snap_a = _make_snapshot("v1", f_orig)
+        snap_b = _make_snapshot("v2", f_orig, f_copy)
+
+        identities = {
+            "cluster:copy": _make_cluster(
+                "cluster:copy",
+                [("v1", "original.txt"), ("v2", "original.txt"), ("v2", "copy.txt")],
+            ),
+        }
+
+        ops = derive_operations_between(snap_a, snap_b, identities)
+        assert len(ops) == 1
+        assert ops[0].op_type == "copy"
+        assert ops[0].file_id == "original.txt"
+        assert ops[0].source_path == "original.txt"
+        assert ops[0].target_path == "copy.txt"
+        assert ops[0].old_hash == "hash_abc"
+        assert ops[0].new_hash == "hash_abc"
+        assert ops[0].confidence == 1.0
+
+    def test_copy_multiple_files(self) -> None:
+        """Several copies in one transition."""
+        f_orig = _make_file("source.txt", "hash_xyz")
+        f_copy1 = _make_file("backup/copy1.txt", "hash_xyz")
+        f_copy2 = _make_file("backup/copy2.txt", "hash_xyz")
+        snap_a = _make_snapshot("v1", f_orig)
+        snap_b = _make_snapshot("v2", f_orig, f_copy1, f_copy2)
+
+        identities = {
+            "cluster:multi": _make_cluster(
+                "cluster:multi",
+                [
+                    ("v1", "source.txt"),
+                    ("v2", "source.txt"),
+                    ("v2", "backup/copy1.txt"),
+                    ("v2", "backup/copy2.txt"),
+                ],
+            ),
+        }
+
+        ops = derive_operations_between(snap_a, snap_b, identities)
+        assert len(ops) == 2
+        copy_ops = sorted(ops, key=lambda o: o.target_path or "")
+        assert copy_ops[0].op_type == "copy"
+        assert copy_ops[0].source_path == "source.txt"
+        assert copy_ops[0].target_path == "backup/copy1.txt"
+        assert copy_ops[1].op_type == "copy"
+        assert copy_ops[1].source_path == "source.txt"
+        assert copy_ops[1].target_path == "backup/copy2.txt"
+
+    def test_copy_does_not_create(self) -> None:
+        """New path with different hash → create op, not copy."""
+        f_orig = _make_file("f.txt", "hash_aaa")
+        f_new = _make_file("new.txt", "hash_bbb")
+        snap_a = _make_snapshot("v1", f_orig)
+        snap_b = _make_snapshot("v2", f_orig, f_new)
+
+        identities = {
+            "cluster:new": _make_cluster(
+                "cluster:new",
+                [("v1", "f.txt"), ("v2", "f.txt"), ("v2", "new.txt")],
+            ),
+        }
+
+        ops = derive_operations_between(snap_a, snap_b, identities)
+        assert len(ops) == 1
+        assert ops[0].op_type == "create"
+        assert ops[0].file_id == "new.txt"
+        assert ops[0].target_path == "new.txt"
+        assert ops[0].new_hash == "hash_bbb"
+        assert ops[0].source_path is None
+
+    def test_copy_renames_unaffected(self) -> None:
+        """Rename still works alongside copies."""
+        f_old = _make_file("old.py", "hash_ren")
+        f_new = _make_file("new.py", "hash_ren")
+        f_orig = _make_file("data.txt", "hash_cp")
+        f_copy = _make_file("data_backup.txt", "hash_cp")
+        snap_a = _make_snapshot("v1", f_old, f_orig)
+        snap_b = _make_snapshot("v2", f_new, f_orig, f_copy)
+
+        identities = {
+            "cluster:rename": _make_cluster(
+                "cluster:rename",
+                [("v1", "old.py"), ("v2", "new.py")],
+            ),
+            "cluster:copy": _make_cluster(
+                "cluster:copy",
+                [("v1", "data.txt"), ("v2", "data.txt"), ("v2", "data_backup.txt")],
+            ),
+        }
+
+        ops = derive_operations_between(snap_a, snap_b, identities)
+        assert len(ops) == 2
+
+        op_map: dict[str, EditOperation] = {}
+        for op in ops:
+            key = f"{op.op_type}:{op.file_id}"
+            op_map[key] = op
+
+        assert "rename:old.py" in op_map
+        rename_op = op_map["rename:old.py"]
+        assert rename_op.source_path == "old.py"
+        assert rename_op.target_path == "new.py"
+
+        assert "copy:data.txt" in op_map
+        copy_op = op_map["copy:data.txt"]
+        assert copy_op.source_path == "data.txt"
+        assert copy_op.target_path == "data_backup.txt"

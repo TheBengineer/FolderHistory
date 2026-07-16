@@ -79,13 +79,9 @@ class DisjointSet:
 
 # ── Global identity assignment ────────────────────────────────────────────────
 
-_IDENTITY_PROJECT_UID: str = "default"
-"""Project UID used in single-root (Phase 1) mode."""
-
-
-def _identity_key(path: str) -> str:
-    """Build a serialised identity key ``"default:<path>"``."""
-    return f"{_IDENTITY_PROJECT_UID}:{path}"
+def _identity_key(path: str, project_uid: str = "default") -> str:
+    """Build a serialised identity key ``"<project_uid>:<path>"``."""
+    return f"{project_uid}:{path}"
 
 
 _KB_ANCHOR_PREFIX = "kb:"
@@ -104,13 +100,14 @@ def _kb_anchor_key(cluster_uid: str) -> str:
 def assign_identities_exact(
     snapshots: list[Snapshot],
     kb: ReadOnlyKB | None = None,
+    project_uid: str = "default",
 ) -> dict[str, IdentityCluster]:
     """Assign global identities using exact content-hash matching.
 
     Algorithm
     ---------
     1.  For every file across all snapshots, build an identity key
-        ``"default:<relative_path>"``.
+        ``"<project_uid>:<relative_path>"``.
     2.  Build a hash index: ``raw_blake3`` → set of identity keys.
     3.  For every hash that maps to **multiple** identity keys (indicating
         identical content at different paths — i.e. a rename), union those
@@ -137,6 +134,8 @@ def assign_identities_exact(
     kb:
         Optional read-only knowledge base for cross-run state reuse.  When
         ``None`` (default), behaviour is identical to the previous API.
+    project_uid:
+        Project UID to scope identity keys.  Defaults to ``"default"``.
 
     Returns
     -------
@@ -156,7 +155,7 @@ def assign_identities_exact(
 
     for snap in snapshots:
         for f in snap.files:
-            ikey = _identity_key(f.path)
+            ikey = _identity_key(f.path, project_uid)
             obs.setdefault(ikey, []).append((snap.id, f.path))
 
             if f.raw_blake3:
@@ -184,7 +183,7 @@ def assign_identities_exact(
     all_ikeys: set[str] = set()
     for snap in snapshots:
         for f in snap.files:
-            all_ikeys.add(_identity_key(f.path))
+            all_ikeys.add(_identity_key(f.path, project_uid))
 
     # Ensure every key is registered in the DS (even singletons).
     for ikey in all_ikeys:
@@ -237,6 +236,7 @@ def assign_identities_exact(
 def assign_identities_with_blocking(
     snapshots: list[Snapshot],
     kb: ReadOnlyKB | None = None,
+    project_uid: str = "default",
 ) -> dict[str, IdentityCluster]:
     """Size-blocked variant of :func:`assign_identities_exact`.
 
@@ -285,7 +285,7 @@ def assign_identities_with_blocking(
 
     for snap in snapshots:
         for f in snap.files:
-            ikey = _identity_key(f.path)
+            ikey = _identity_key(f.path, project_uid)
             all_ikeys.add(ikey)
             obs.setdefault(ikey, []).append((snap.id, f.path))
 

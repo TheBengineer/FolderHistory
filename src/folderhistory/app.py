@@ -1,7 +1,8 @@
 """Typer CLI for FolderHistory.
 
-Provides ``analyze``, ``diff``, and ``log`` commands for reconstructing
-and inspecting folder history from a collection of snapshots.
+Provides ``analyze``, ``diff``, ``log``, and ``kb-status`` commands for
+reconstructing and inspecting folder history from a collection of snapshots,
+with Knowledge Base support for iterative feedback loops.
 """
 
 from __future__ import annotations
@@ -16,6 +17,9 @@ from folderhistory.core.identity import assign_identities_exact
 from folderhistory.core.ingest import ingest_manifest, ingest_snapshot
 from folderhistory.core.timeline import Timeline, TimelineNode, build_timeline
 from folderhistory.io.output import format_gitlog, format_json, format_jsonlines
+from folderhistory.knowledge.json_kb import JSONKnowledgeBase
+from folderhistory.knowledge.types import VersionMeta
+from folderhistory.knowledge.update import compute_igs
 from folderhistory.types import EditOperation, Snapshot
 
 
@@ -23,6 +27,61 @@ app = typer.Typer(
     name="folderhistory",
     help="Reconstruct git-like version history from folder backups.",
 )
+
+_DEFAULT_KB_PATH = Path.home() / ".folderhistory" / "kb.json"
+
+
+def _resolve_kb_path(kb_path: Path | None) -> Path:
+    """Resolve the KB file path, falling back to *~/.folderhistory/kb.json*."""
+    return kb_path.resolve() if kb_path is not None else _DEFAULT_KB_PATH
+
+
+def _kb_has_data(kb: JSONKnowledgeBase) -> bool:
+    """Check whether the KB already contains persisted identity data."""
+    return _count_kb_identities(kb) > 0
+
+
+def _count_kb_identities(kb: JSONKnowledgeBase) -> int:
+    """Number of identity entries in a JSONKnowledgeBase (internal inspection)."""
+    import typing
+
+    data: dict[str, object] = typing.cast("dict[str, object]", getattr(kb, "_data", {}))
+    raw_val: object = data.get("identities", {})
+    return len(typing.cast("dict[str, object]", raw_val)) if isinstance(raw_val, dict) else 0
+
+
+def _count_kb_projects(kb: JSONKnowledgeBase) -> int:
+    """Number of project entries in a JSONKnowledgeBase (internal inspection)."""
+    import typing
+
+    data: dict[str, object] = typing.cast("dict[str, object]", getattr(kb, "_data", {}))
+    raw_val: object = data.get("projects", {})
+    return len(typing.cast("dict[str, object]", raw_val)) if isinstance(raw_val, dict) else 0
+
+
+def _apply_corrections(kb: JSONKnowledgeBase, corrections_path: Path) -> None:
+    """Load a corrections JSON array and write each entry into the KB."""
+    import json
+
+    raw_text = corrections_path.read_text(encoding="utf-8")
+    parsed: object = json.loads(raw_text)  # pyright: ignore[reportAny]
+    if not isinstance(parsed, list):
+        typer.echo("Corrections file must be a JSON array", err=True)
+        raise typer.Exit(code=1)
+
+    applied = 0
+    parsed_list = cast("list[object]", parsed)
+    for elem in parsed_list:
+        if not isinstance(elem, dict):
+            continue
+        entry = cast("dict[str, object]", elem)
+        hash_val: object = entry.get("hash", "")
+        cluster_uid: object = entry.get("override_cluster_uid", "")
+        if isinstance(hash_val, str) and isinstance(cluster_uid, str) and hash_val and cluster_uid:
+            kb.set_identity(hash_val, cluster_uid, 1.0)
+            applied += 1
+
+    typer.echo(f"Applied {applied} correction(s) to KB")
 
 
 # ── analyze ────────────────────────────────────────────────────────────────────
@@ -50,25 +109,92 @@ def analyze(
         "-f",
         help="Output format: json, gitlog, jsonlines",
     ),
+    mode: str = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        "auto",
+        "--mode",
+        "-m",
+        help="Processing mode: full, delta, auto",
+    ),
+    apply: Path | None = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        None,
+        "--apply",
+        help="Apply user corrections JSON file to identity assignment",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    kb_rollback: int | None = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        None,
+        "--kb-rollback",
+        help="Restore KB version N before running",
+    ),
+    kb_path: Path | None = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        None,
+        "--kb-path",
+        help="Custom KB file path",
+    ),
 ) -> None:
+    """Analyze snapshots and reconstruct folder history.
+
+    If --apply corrections.json: load user corrections and apply to identity assignment.
+    If --kb-rollback N: restore KB version N before running.
+    If --mode full: force full reprocessing (ignore KB).
+    If --mode delta: only process unmatched hashes via KB.
+    If --mode auto (default): auto-detect based on KB state.
+    """
     snapshots_dir_resolved = snapshots_dir.resolve()
+
+    # ── KB initialisation ──────────────────────────────────────────────
+    kb_path_resolved = _resolve_kb_path(kb_path)
+
+    # Rollback (honoured regardless of mode)
+    if kb_rollback is not None:
+        try:
+            JSONKnowledgeBase.rollback(kb_path_resolved, kb_rollback)
+            typer.echo(f"KB rolled back to version {kb_rollback}")
+        except (FileNotFoundError, ValueError) as exc:
+            typer.echo(f"KB rollback failed: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+    # Open KB when needed for corrections or identity seeding
+    use_kb = mode != "full" or apply is not None or kb_rollback is not None
+    kb: JSONKnowledgeBase | None = None
+
+    if use_kb:
+        kb = JSONKnowledgeBase(kb_path_resolved)
+        kb.open()
+
+        if apply is not None:
+            _apply_corrections(kb, apply)
+
+        # Auto mode: close KB if it has no data and no corrections applied
+        if mode == "auto" and not _kb_has_data(kb):
+            kb.close()
+            kb = None
+
+    # ── Snapshot processing ────────────────────────────────────────────
     snapshot_dirs = sorted(
         [d for d in snapshots_dir_resolved.iterdir() if d.is_dir()],
     )
     if not snapshot_dirs:
-        _ = typer.echo(
+        typer.echo(
             f"No snapshot directories found in {snapshots_dir_resolved}",
             err=True,
         )
         raise typer.Exit(code=1)
 
     snapshots = [ingest_snapshot(d) for d in snapshot_dirs]
-    identities = assign_identities_exact(snapshots)
+    identities = assign_identities_exact(snapshots, kb=kb)
     operations = derive_operations(snapshots, identities)
     timeline = build_timeline(snapshots, operations)
     output_text = _format_timeline(timeline, output_format)
     _ = output.write_text(output_text)
-    _ = typer.echo(f"Timeline written to {output}")
+    typer.echo(f"Timeline written to {output}")
+
+    # ── Clean-up ───────────────────────────────────────────────────────
+    if kb is not None:
+        kb.close()
 
 
 # ── diff ───────────────────────────────────────────────────────────────────────
@@ -133,6 +259,53 @@ def log(
     raw = cast("dict[str, object]", orjson.loads(manifest.read_bytes()))
     timeline = _parse_timeline_json(raw)
     _ = typer.echo(format_gitlog(timeline))
+
+
+# ── kb-status ────────────────────────────────────────────────────────────────
+
+
+@app.command(name="kb-status")
+def kb_status(
+    kb_path: Path | None = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        None,
+        "--kb-path",
+        help="Custom KB file path",
+    ),
+) -> None:
+    """Display Knowledge Base status: version, run count, identity/project/contradiction counts, IGS."""
+    kb_path_resolved = _resolve_kb_path(kb_path)
+
+    if not kb_path_resolved.exists():
+        typer.echo(f"Knowledge Base not found at {kb_path_resolved}")
+        raise typer.Exit(code=1)
+
+    kb = JSONKnowledgeBase(kb_path_resolved)
+    kb.open()
+
+    try:
+        version_meta = cast(VersionMeta, kb.version())
+        contradictions = kb.get_contradictions()
+        # Suppress internal IGS warning — the value is printed below
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            igs = compute_igs(kb)
+
+        identity_count = _count_kb_identities(kb)
+        project_count = _count_kb_projects(kb)
+
+        typer.echo(f"KB path:    {kb_path_resolved}")
+        typer.echo(f"Schema v:   {version_meta.schema_version}")
+        typer.echo(f"Algorithm:  {version_meta.algorithm_version}")
+        typer.echo(f"Last run:   {version_meta.last_run_id or '(never)'}")
+        typer.echo(f"Run count:  {version_meta.run_count}")
+        typer.echo(f"Identities: {identity_count}")
+        typer.echo(f"Projects:   {project_count}")
+        typer.echo(f"Contradict: {len(contradictions)}")
+        typer.echo(f"IGS:        {igs:.4f}")
+    finally:
+        kb.close()
 
 
 def main() -> None:

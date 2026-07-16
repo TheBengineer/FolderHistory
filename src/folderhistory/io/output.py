@@ -10,7 +10,7 @@ import datetime
 
 import orjson
 
-from folderhistory.core.timeline import Timeline
+from folderhistory.core.timeline import BranchingTimeline, Timeline
 from folderhistory.types import EditOperation
 
 
@@ -120,3 +120,42 @@ def _format_timestamp(timestamp: float) -> str:
     """Format a Unix timestamp as a human-readable date-time string."""
     dt = datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
     return dt.strftime("%a %b %d %H:%M:%S %Y %z")
+
+
+# ── Branching DAG output ────────────────────────────────────────────────────────
+
+
+def format_branching_dag(timeline: BranchingTimeline) -> str:
+    """Return a DOT graph string suitable for rendering with Graphviz.
+
+    Each :class:`BranchingNode` becomes a box-shaped node labelled with its
+    snapshot ID.  Edges represent parent-child relationships.  Fork points
+    (multiple outgoing edges) and merge points (multiple incoming edges) are
+    visually distinct by construction.
+
+    The output is valid DOT that can be piped directly into ``dot``,
+    ``neato``, or rendered with ``xdot``.
+    """
+    lines: list[str] = [
+        "digraph BranchingTimeline {",
+        "    node [shape=box, style=rounded];",
+        "",
+    ]
+
+    # Emit nodes.
+    for sid, node in timeline.nodes.items():
+        label = sid
+        op_count = len(node.operations)
+        if op_count > 0:
+            label += f"\\n{op_count} ops"
+        lines.append(f'    "{sid}" [label="{label}"];')
+
+    lines.append("")
+
+    # Emit edges.
+    for sid, node in timeline.nodes.items():
+        for child_id in node.children_ids:
+            lines.append(f'    "{sid}" -> "{child_id}";')
+
+    lines.append("}")
+    return "\n".join(lines)

@@ -4,6 +4,20 @@
 
 When you have a pile of backup snapshots of a directory — taken at different times, possibly overlapping, with timestamps that may be unreliable — FolderHistory reconstructs the most likely sequence of changes: which files were created, modified, moved, renamed, or deleted, and in what order.
 
+## Output Options
+
+FolderHistory produces three different kinds of output from the same analysis:
+
+| Output | What you get | Best for |
+|--------|-------------|----------|
+| **JSON** | Machine-readable timeline with all operations, identities, and metadata | Pipelines, automation, integration |
+| **Working Copy** | `Content/` (latest files) + `Snapshots/dated/` (incremental deltas + CHANGES.txt) | Direct browsing, no git needed, intuitive undo history |
+| **Git Repos** | Real `.git/` repositories with commit history and metadata in `refs/notes/fh/*` | git tooling (`git log`, `git blame`, `git diff`), pushing to remotes |
+
+The **Working Copy** format stores the latest files in `Content/` and only changed files in each dated snapshot, deduplicated by BLAKE3 hash. Snapshots symlink into the Content store — no copies. Deleted files are preserved in `.fh-deleted/`. A `CHANGES.txt` in each snapshot folder provides both machine-parseable and human-readable change logs.
+
+The **Git Repos** format creates a real git repository from the timeline, with one commit per snapshot, auto-detected renames, and metadata (ctime, permissions, confidence) stored via `git notes` in `refs/notes/fh/*` namespaces. Perfect for when you want the full git workflow on reconstructed history.
+
 ## Quick Start
 
 ```bash

@@ -33,9 +33,9 @@ from typing import cast
 
 SCENARIO_DEFAULTS: dict[str, int] = {
     "ordered-evolution": 5,
-    "unordered-timestamps": 5,
+    "unordered-timestamps": 4,
     "branching": 4,
-    "flash-drive-chain": 5,
+    "flash-drive-chain": 4,
     "corruption-mix": 6,
 }
 
@@ -100,6 +100,7 @@ class _GeneratorState:
         self.seed: int = 42
         self.scenario: str = ""
         self.snapshot_names: list[str] = []
+        self.source_paths: list[str] | None = None
 
 
 # ── Content utilities ────────────────────────────────────────────────────────
@@ -109,6 +110,23 @@ def _make_content(path: str, version: int, seed: int) -> bytes:
     """Produce deterministic content via SHA256 hex digest."""
     h = hashlib.sha256(f"{path}:v{version}:{seed}".encode()).hexdigest()
     return h.encode()
+
+
+def _make_text(path: str, version: int, seed: int) -> bytes:
+    """Multi-line text content (useful for line-ending testing)."""
+    h = hashlib.sha256(f"{path}:v{version}:{seed}".encode()).hexdigest()
+    return (
+        f"# {path} v{version} {h[:16]}\n"
+        f"line1\n"
+        f"line2\n"
+        f"line3\n"
+    ).encode()
+
+
+def _make_fid(name: str, seed: int) -> str:
+    """Deterministic UUID v4-compatible file_id for a logical file."""
+    digest = hashlib.sha256(f"fh:fid:{name}:{seed}".encode()).digest()[:16]
+    return str(uuid.UUID(int=int.from_bytes(digest, "big")))
 
 
 def _compute_timestamp(
@@ -155,10 +173,13 @@ def _build_snapshot_info(state: _GeneratorState) -> list[dict[str, str | float]]
     """Build snapshot metadata list from generator state."""
     info: list[dict[str, str | float]] = []
     for i, name in enumerate(state.snapshot_names):
+        source: str = (
+            state.source_paths[i] if state.source_paths else name
+        )
         info.append({
             "id": name,
             "timestamp": state.timestamps[i],
-            "source_path": name,
+            "source_path": source,
         })
     return info
 
@@ -298,73 +319,184 @@ def _derive_ground_truth(state: _GeneratorState) -> dict[str, object]:
     }
 
 
-# ── Shared stub helper ───────────────────────────────────────────────────────
-
-
-def _make_stub_state(
-    scenario: str,
-    num_snapshots: int,
-    seed: int,
-) -> _GeneratorState:
-    """Create minimal generator state for stub scenarios.
-
-    Each snapshot contains a single placeholder file whose content
-    changes deterministically with each version.  Every snapshot
-    gets a unique file_id so ground-truth derivation exercises the
-    create/delete path.
-    """
-    state = _GeneratorState()
-    state.seed = seed
-    state.scenario = scenario
-    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
-    baseline = 1700000000.0
-    state.timestamps = [
-        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
-    ]
-    rng = random.Random(seed)  # noqa: S311
-    for i in range(num_snapshots):
-        snap = _SnapshotState()
-        content = _make_content("README.md", i, seed)
-        snap.add_file(
-            _TrackedFile(
-                file_id=str(uuid.UUID(int=rng.getrandbits(128))),
-                path="README.md",
-                content=content,
-                mtime_ns=int(state.timestamps[i] * _NS_IN_SEC),
-                ctime_ns=int(state.timestamps[i] * _NS_IN_SEC),
-                mode=0o644,
-            ),
-        )
-        state.snapshots.append(snap)
-    return state
-
-
-# ── Scenario generators (stubs) ──────────────────────────────────────────────
+# ── Scenario generators ──────────────────────────────────────────────────────
 
 
 def _generate_ordered_evolution(
     num_snapshots: int,
     seed: int,
 ) -> _GeneratorState:
-    """Evolve files cleanly with clear create/modify/delete patterns.
+    """Clean sequential evolution with create/modify/rename/delete.
 
-    TODO: Implement full scenario logic with multi-file evolution.
+    S0: README.md, src/main.py, src/utils.py, .gitignore
+    S1: modify src/main.py (feature A), modify README.md (update docs)
+    S2: create tests/test_main.py, modify src/utils.py (helper B)
+    S3: rename src/utils.py -> src/helpers.py, modify README.md
+    S4: create src/cli.py, delete .gitignore
     """
-    return _make_stub_state("ordered-evolution", num_snapshots, seed)
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "ordered-evolution"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+    state.timestamps = [
+        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
+    ]
+
+    # Logical file identities (stable UUIDs across renames)
+    fid_readme = _make_fid("ordered_readme", seed)
+    fid_main = _make_fid("ordered_main", seed)
+    fid_utils = _make_fid("ordered_utils", seed)  # utils.py -> helpers.py
+    fid_gitignore = _make_fid("ordered_gitignore", seed)
+    fid_test = _make_fid("ordered_test", seed)
+    fid_cli = _make_fid("ordered_cli", seed)
+
+    # Per-snapshot file definitions: (file_id, path, version)
+    # Content version uses canonical content_path for identity stability
+    #   - fid_utils uses "src/utils.py" as content_path across rename
+    snapshot_plan: list[list[tuple[str, str, int, str]]] = [
+        # S0: initial files
+        [
+            (fid_readme, "README.md", 0, "README.md"),
+            (fid_main, "src/main.py", 0, "src/main.py"),
+            (fid_utils, "src/utils.py", 0, "src/utils.py"),
+            (fid_gitignore, ".gitignore", 0, ".gitignore"),
+        ],
+        # S1: modify main.py and README.md
+        [
+            (fid_readme, "README.md", 1, "README.md"),
+            (fid_main, "src/main.py", 1, "src/main.py"),
+            (fid_utils, "src/utils.py", 0, "src/utils.py"),
+            (fid_gitignore, ".gitignore", 0, ".gitignore"),
+        ],
+        # S2: create tests, modify utils.py
+        [
+            (fid_readme, "README.md", 1, "README.md"),
+            (fid_main, "src/main.py", 1, "src/main.py"),
+            (fid_utils, "src/utils.py", 1, "src/utils.py"),
+            (fid_gitignore, ".gitignore", 0, ".gitignore"),
+            (fid_test, "tests/test_main.py", 0, "tests/test_main.py"),
+        ],
+        # S3: rename utils.py -> helpers.py, modify README.md
+        [
+            (fid_readme, "README.md", 2, "README.md"),
+            (fid_main, "src/main.py", 1, "src/main.py"),
+            (fid_utils, "src/helpers.py", 1, "src/utils.py"),
+            (fid_gitignore, ".gitignore", 0, ".gitignore"),
+            (fid_test, "tests/test_main.py", 0, "tests/test_main.py"),
+        ],
+        # S4: create cli.py, delete .gitignore
+        [
+            (fid_readme, "README.md", 2, "README.md"),
+            (fid_main, "src/main.py", 1, "src/main.py"),
+            (fid_utils, "src/helpers.py", 1, "src/utils.py"),
+            (fid_test, "tests/test_main.py", 0, "tests/test_main.py"),
+            (fid_cli, "src/cli.py", 0, "src/cli.py"),
+        ],
+    ]
+
+    for snap_idx in range(min(num_snapshots, len(snapshot_plan))):
+        snap = _SnapshotState()
+        ts_ns = int(state.timestamps[snap_idx] * _NS_IN_SEC)
+        for fid, path, version, content_path in snapshot_plan[snap_idx]:
+            content = _make_content(content_path, version, seed)
+            snap.add_file(
+                _TrackedFile(
+                    file_id=fid,
+                    path=path,
+                    content=content,
+                    mtime_ns=ts_ns,
+                    ctime_ns=ts_ns,
+                    mode=0o644,
+                ),
+            )
+        state.snapshots.append(snap)
+    return state
 
 
 def _generate_unordered_timestamps(
     num_snapshots: int,
     seed: int,
 ) -> _GeneratorState:
-    """Produce snapshots with timestamps that don't match logical order.
+    """Snapshots whose timestamps don't match content evolution order.
 
-    TODO: Implement full scenario logic with shuffled timestamps
-    and content that conflicts with temporal ordering.
+    Content evolves S0->S1->S2->S3 naturally but timestamps use
+    shuffled indices [3, 1, 4, 2] to create temporal mismatch.
+
+    S0 (timestamp=3): README.md, src/main.py, src/utils.py
+    S1 (timestamp=1): modify src/main.py, create src/cli.py
+    S2 (timestamp=4): modify README.md, create tests/test_main.py
+    S3 (timestamp=2): modify src/utils.py, create data/config.json
     """
-    state = _make_stub_state("unordered-timestamps", num_snapshots, seed)
-    rng = random.Random(seed)  # noqa: S311
-    rng.shuffle(state.timestamps)
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "unordered-timestamps"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+
+    # Timestamp indices are shuffled: content order != temporal order
+    timestamp_indices = [3, 1, 4, 2]
+    state.timestamps = [
+        _compute_timestamp(baseline, ts_idx, seed)
+        for ts_idx in timestamp_indices[:num_snapshots]
+    ]
+
+    fid_readme = _make_fid("unordered_readme", seed)
+    fid_main = _make_fid("unordered_main", seed)
+    fid_utils = _make_fid("unordered_utils", seed)
+    fid_cli = _make_fid("unordered_cli", seed)
+    fid_test = _make_fid("unordered_test", seed)
+    fid_config = _make_fid("unordered_config", seed)
+
+    snapshot_plan: list[list[tuple[str, str, int]]] = [
+        # S0: initial files
+        [
+            (fid_readme, "README.md", 0),
+            (fid_main, "src/main.py", 0),
+            (fid_utils, "src/utils.py", 0),
+        ],
+        # S1: modify main.py, create cli.py
+        [
+            (fid_readme, "README.md", 0),
+            (fid_main, "src/main.py", 1),
+            (fid_utils, "src/utils.py", 0),
+            (fid_cli, "src/cli.py", 0),
+        ],
+        # S2: modify README.md, create tests
+        [
+            (fid_readme, "README.md", 1),
+            (fid_main, "src/main.py", 1),
+            (fid_utils, "src/utils.py", 0),
+            (fid_cli, "src/cli.py", 0),
+            (fid_test, "tests/test_main.py", 0),
+        ],
+        # S3: modify utils.py, create config.json
+        [
+            (fid_readme, "README.md", 1),
+            (fid_main, "src/main.py", 1),
+            (fid_utils, "src/utils.py", 1),
+            (fid_cli, "src/cli.py", 0),
+            (fid_test, "tests/test_main.py", 0),
+            (fid_config, "data/config.json", 0),
+        ],
+    ]
+
+    for snap_idx in range(min(num_snapshots, len(snapshot_plan))):
+        snap = _SnapshotState()
+        ts_ns = int(state.timestamps[snap_idx] * _NS_IN_SEC)
+        for fid, path, version in snapshot_plan[snap_idx]:
+            content = _make_content(path, version, seed)
+            snap.add_file(
+                _TrackedFile(
+                    file_id=fid,
+                    path=path,
+                    content=content,
+                    mtime_ns=ts_ns,
+                    ctime_ns=ts_ns,
+                    mode=0o644,
+                ),
+            )
+        state.snapshots.append(snap)
     return state
 
 
@@ -372,36 +504,443 @@ def _generate_branching(
     num_snapshots: int,
     seed: int,
 ) -> _GeneratorState:
-    """Create branching history where snapshots diverge.
+    """Divergent branches from common ancestor, then a merge state.
 
-    TODO: Implement full scenario logic with a fork point and
-    independently evolving branches.
+    S0 (ancestor): README.md, src/core.py, src/utils.py, data/config.json
+    S1 (branch-a): modify src/core.py, create src/feature_a.py, del utils.py
+    S2 (branch-b): modify src/utils.py, create src/feature_b.py, docs/guide.md
+    S3 (merged): all files from both branches present (merge state)
+
+    Identity clusters:
+      - README.md, data/config.json span all 4
+      - src/core.py spans S0, S1, S3 (not S2)
+      - src/utils.py spans S0, S2, S3 (not S1)
+      - Branch-specific files appear only in their lineage
     """
-    return _make_stub_state("branching", num_snapshots, seed)
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "branching"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+    state.timestamps = [
+        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
+    ]
+
+    fid_readme = _make_fid("branch_readme", seed)
+    fid_core = _make_fid("branch_core", seed)  # S0, S1, S3
+    fid_utils = _make_fid("branch_utils", seed)  # S0, S2, S3
+    fid_config = _make_fid("branch_config", seed)  # all
+    fid_feature_a = _make_fid("branch_feature_a", seed)  # S1, S3
+    fid_feature_b = _make_fid("branch_feature_b", seed)  # S2, S3
+    fid_guide = _make_fid("branch_guide", seed)  # S2, S3
+
+    snapshot_plan: list[list[tuple[str, str, int]]] = [
+        # S0 (ancestor)
+        [
+            (fid_readme, "README.md", 0),
+            (fid_core, "src/core.py", 0),
+            (fid_utils, "src/utils.py", 0),
+            (fid_config, "data/config.json", 0),
+        ],
+        # S1 (branch-a): core.py modified, feature_a.py created, utils deleted
+        [
+            (fid_readme, "README.md", 0),
+            (fid_core, "src/core.py", 1),
+            (fid_config, "data/config.json", 0),
+            (fid_feature_a, "src/feature_a.py", 0),
+        ],
+        # S2 (branch-b): utils.py modified, feature_b.py + guide created
+        [
+            (fid_readme, "README.md", 0),
+            (fid_utils, "src/utils.py", 1),
+            (fid_config, "data/config.json", 0),
+            (fid_feature_b, "src/feature_b.py", 0),
+            (fid_guide, "docs/guide.md", 0),
+        ],
+        # S3 (merged): all files from both branches
+        [
+            (fid_readme, "README.md", 0),
+            (fid_core, "src/core.py", 1),
+            (fid_utils, "src/utils.py", 1),
+            (fid_config, "data/config.json", 0),
+            (fid_feature_a, "src/feature_a.py", 0),
+            (fid_feature_b, "src/feature_b.py", 0),
+            (fid_guide, "docs/guide.md", 0),
+        ],
+    ]
+
+    for snap_idx in range(min(num_snapshots, len(snapshot_plan))):
+        snap = _SnapshotState()
+        ts_ns = int(state.timestamps[snap_idx] * _NS_IN_SEC)
+        for fid, path, version in snapshot_plan[snap_idx]:
+            content = _make_content(path, version, seed)
+            snap.add_file(
+                _TrackedFile(
+                    file_id=fid,
+                    path=path,
+                    content=content,
+                    mtime_ns=ts_ns,
+                    ctime_ns=ts_ns,
+                    mode=0o644,
+                ),
+            )
+        state.snapshots.append(snap)
+    return state
 
 
 def _generate_flash_drive_chain(
     num_snapshots: int,
     seed: int,
 ) -> _GeneratorState:
-    """Simulate flash drive backup chain with ctime resets.
+    """USB backup chain with ctime resets, CRLF injection, device copies.
 
-    TODO: Implement full scenario logic with ctime-reset patterns
-    and source_path changes across snapshots.
+    S0 (laptop): LF content, original ctimes
+    S1 (USB): ctime reset to current, main.py has CRLF line endings
+    S2 (USB week2): modify main.py, create new_feature.py
+    S3 (new laptop): all ctime reset again, content identical to S2
+
+    Each "device" has a distinct source_path. CRLF files contain
+    actual \\r\\n byte sequences.
     """
-    return _make_stub_state("flash-drive-chain", num_snapshots, seed)
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "flash-drive-chain"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+    state.timestamps = [
+        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
+    ]
+    state.source_paths = ["laptop", "usb_drive", "usb_drive", "new_laptop"]
+
+    fid_readme = _make_fid("flash_readme", seed)
+    fid_main = _make_fid("flash_main", seed)
+    fid_utils = _make_fid("flash_utils", seed)
+    fid_config = _make_fid("flash_config", seed)
+    fid_new_feature = _make_fid("flash_new_feature", seed)
+
+    # Helper: content with newlines (for CRLF conversion)
+    def lf(path: str, v: int) -> bytes:
+        return _make_text(path, v, seed)
+
+    def crlf(path: str, v: int) -> bytes:
+        return _make_text(path, v, seed).replace(b"\n", b"\r\n")
+
+    ts = [int(state.timestamps[i] * _NS_IN_SEC) for i in range(num_snapshots)]
+
+    # S0: original laptop — all LF, original ctimes
+    snap0 = _SnapshotState()
+    snap0.add_file(
+        _TrackedFile(fid_readme, "README.md", lf("README.md", 0), ts[0], ts[0], 0o644),
+    )
+    snap0.add_file(
+        _TrackedFile(fid_main, "src/main.py", lf("src/main.py", 0), ts[0], ts[0], 0o644),
+    )
+    snap0.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", lf("src/utils.py", 0), ts[0], ts[0], 0o644),
+    )
+    snap0.add_file(
+        _TrackedFile(fid_config, "data/config.json", lf("data/config.json", 0), ts[0], ts[0], 0o644),
+    )
+    state.snapshots.append(snap0)
+    if num_snapshots < 2:
+        return state
+
+    # S1: USB copy — ctime reset to ts[1], main.py becomes CRLF, mtime preserved
+    snap1 = _SnapshotState()
+    snap1.add_file(
+        _TrackedFile(fid_readme, "README.md", lf("README.md", 0), ts[0], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_main, "src/main.py", crlf("src/main.py", 0), ts[0], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", lf("src/utils.py", 0), ts[0], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_config, "data/config.json", lf("data/config.json", 0), ts[0], ts[1], 0o644),
+    )
+    state.snapshots.append(snap1)
+    if num_snapshots < 3:
+        return state
+
+    # S2: USB week2 — modify main.py (CRLF stays), create new_feature.py
+    snap2 = _SnapshotState()
+    snap2.add_file(
+        _TrackedFile(fid_readme, "README.md", lf("README.md", 0), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_main, "src/main.py", crlf("src/main.py", 1), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", lf("src/utils.py", 0), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_config, "data/config.json", lf("data/config.json", 0), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_new_feature, "src/new_feature.py", lf("src/new_feature.py", 0), ts[2], ts[2], 0o644),
+    )
+    state.snapshots.append(snap2)
+    if num_snapshots < 4:
+        return state
+
+    # S3: new laptop — all ctime reset, content identical to S2
+    snap3 = _SnapshotState()
+    snap3.add_file(
+        _TrackedFile(fid_readme, "README.md", lf("README.md", 0), ts[2], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_main, "src/main.py", crlf("src/main.py", 1), ts[2], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", lf("src/utils.py", 0), ts[2], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_config, "data/config.json", lf("data/config.json", 0), ts[2], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_new_feature, "src/new_feature.py", lf("src/new_feature.py", 0), ts[2], ts[3], 0o644),
+    )
+    state.snapshots.append(snap3)
+    return state
 
 
 def _generate_corruption_mix(
     num_snapshots: int,
     seed: int,
 ) -> _GeneratorState:
-    """Corrupt files over time with various damage patterns.
+    """Multi-corruption scenario with metadata and content edge cases.
 
-    TODO: Implement full scenario logic with bit flips, truncations,
-    zeroed content, and partial writes.
+    S0 (clean): standard files + assets/logo.png (binary)
+    S1 (time): README.md mtime=0, create src/epoch_test.py mtime=0
+    S2 (nested): deeply nested a/b/c/d/e/f/g/deep.txt, modify main.py
+    S3 (binary): assets/corrupted.bin with null bytes, modify config.json
+    S4 (perms): restricted/secret.txt mode=0o000, modify utils.py
+    S5 (mixed): cross_platform.py (LF) -> cross_plat.py (CRLF) rename
     """
-    return _make_stub_state("corruption-mix", num_snapshots, seed)
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "corruption-mix"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+    state.timestamps = [
+        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
+    ]
+
+    fid_readme = _make_fid("corrupt_readme", seed)
+    fid_main = _make_fid("corrupt_main", seed)
+    fid_utils = _make_fid("corrupt_utils", seed)
+    fid_config = _make_fid("corrupt_config", seed)
+    fid_logo = _make_fid("corrupt_logo", seed)
+    fid_epoch = _make_fid("corrupt_epoch", seed)
+    fid_deep = _make_fid("corrupt_deep", seed)
+    fid_corrupted_bin = _make_fid("corrupt_bin", seed)
+    fid_secret = _make_fid("corrupt_secret", seed)
+    fid_cross_plat = _make_fid("corrupt_cross_plat", seed)
+
+    ts = [int(state.timestamps[i] * _NS_IN_SEC) for i in range(num_snapshots)]
+
+    # S0: clean baseline
+    snap0 = _SnapshotState()
+    for fid, path, version in [
+        (fid_readme, "README.md", 0),
+        (fid_main, "src/main.py", 0),
+        (fid_utils, "src/utils.py", 0),
+        (fid_config, "data/config.json", 0),
+    ]:
+        content = _make_content(path, version, seed)
+        snap0.add_file(
+            _TrackedFile(fid, path, content, ts[0], ts[0], 0o644),
+        )
+    # Binary logo (no null bytes in hash content, so use random bytes)
+    snap0.add_file(
+        _TrackedFile(
+            fid_logo,
+            "assets/logo.png",
+            bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + b"\x00\x00\x00\x00IEND",
+            ts[0], ts[0], 0o644,
+        ),
+    )
+    state.snapshots.append(snap0)
+    if num_snapshots < 2:
+        return state
+
+    # S1: time corruption — mtime_ns = 0 (epoch)
+    snap1 = _SnapshotState()
+    snap1.add_file(
+        _TrackedFile(fid_readme, "README.md", _make_content("README.md", 1, seed), 0, ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_main, "src/main.py", _make_content("src/main.py", 0, seed), ts[1], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", _make_content("src/utils.py", 0, seed), ts[1], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_config, "data/config.json", _make_content("data/config.json", 0, seed), ts[1], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_logo, "assets/logo.png", snap0.files["assets/logo.png"].content, ts[1], ts[1], 0o644),
+    )
+    snap1.add_file(
+        _TrackedFile(fid_epoch, "src/epoch_test.py", _make_content("src/epoch_test.py", 0, seed), 0, ts[1], 0o644),
+    )
+    state.snapshots.append(snap1)
+    if num_snapshots < 3:
+        return state
+
+    # S2: deep nesting + modify main.py
+    snap2 = _SnapshotState()
+    snap2.add_file(
+        _TrackedFile(fid_readme, "README.md", _make_content("README.md", 1, seed), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_main, "src/main.py", _make_content("src/main.py", 1, seed), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", _make_content("src/utils.py", 0, seed), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_config, "data/config.json", _make_content("data/config.json", 0, seed), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_logo, "assets/logo.png", snap0.files["assets/logo.png"].content, ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(fid_epoch, "src/epoch_test.py", _make_content("src/epoch_test.py", 0, seed), ts[2], ts[2], 0o644),
+    )
+    snap2.add_file(
+        _TrackedFile(
+            fid_deep,
+            "a/b/c/d/e/f/g/deep.txt",
+            _make_content("a/b/c/d/e/f/g/deep.txt", 0, seed),
+            ts[2], ts[2], 0o644,
+        ),
+    )
+    state.snapshots.append(snap2)
+    if num_snapshots < 4:
+        return state
+
+    # S3: binary corruption — corrupted.bin with null bytes, modify config.json
+    snap3 = _SnapshotState()
+    snap3.add_file(
+        _TrackedFile(fid_readme, "README.md", _make_content("README.md", 1, seed), ts[3], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_main, "src/main.py", _make_content("src/main.py", 1, seed), ts[3], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", _make_content("src/utils.py", 0, seed), ts[3], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_config, "data/config.json", _make_content("data/config.json", 1, seed), ts[3], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_logo, "assets/logo.png", snap0.files["assets/logo.png"].content, ts[3], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_epoch, "src/epoch_test.py", _make_content("src/epoch_test.py", 0, seed), ts[3], ts[3], 0o644),
+    )
+    snap3.add_file(
+        _TrackedFile(fid_deep, "a/b/c/d/e/f/g/deep.txt", _make_content("a/b/c/d/e/f/g/deep.txt", 0, seed), ts[3], ts[3], 0o644),
+    )
+    # Binary file with null bytes
+    null_content = b"\x00" * 64
+    snap3.add_file(
+        _TrackedFile(fid_corrupted_bin, "assets/corrupted.bin", null_content, ts[3], ts[3], 0o644),
+    )
+    state.snapshots.append(snap3)
+    if num_snapshots < 5:
+        return state
+
+    # S4: permissions — restricted/secret.txt mode=0o000, modify utils.py
+    snap4 = _SnapshotState()
+    snap4.add_file(
+        _TrackedFile(fid_readme, "README.md", _make_content("README.md", 1, seed), ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_main, "src/main.py", _make_content("src/main.py", 1, seed), ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", _make_content("src/utils.py", 1, seed), ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_config, "data/config.json", _make_content("data/config.json", 1, seed), ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_logo, "assets/logo.png", snap0.files["assets/logo.png"].content, ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_epoch, "src/epoch_test.py", _make_content("src/epoch_test.py", 0, seed), ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_deep, "a/b/c/d/e/f/g/deep.txt", _make_content("a/b/c/d/e/f/g/deep.txt", 0, seed), ts[4], ts[4], 0o644),
+    )
+    snap4.add_file(
+        _TrackedFile(fid_corrupted_bin, "assets/corrupted.bin", null_content, ts[4], ts[4], 0o644),
+    )
+    # Restricted permissions file
+    snap4.add_file(
+        _TrackedFile(
+            fid_secret,
+            "restricted/secret.txt",
+            _make_content("restricted/secret.txt", 0, seed),
+            ts[4], ts[4], 0o000,
+        ),
+    )
+    # cross_platform.py (LF) — will be renamed in S5
+    snap4.add_file(
+        _TrackedFile(
+            fid_cross_plat,
+            "src/cross_platform.py",
+            _make_text("src/cross_platform.py", 0, seed),
+            ts[4], ts[4], 0o644,
+        ),
+    )
+    state.snapshots.append(snap4)
+    if num_snapshots < 6:
+        return state
+
+    # S5: mixed endings — rename cross_platform.py -> cross_plat.py with CRLF
+    snap5 = _SnapshotState()
+    snap5.add_file(
+        _TrackedFile(fid_readme, "README.md", _make_content("README.md", 1, seed), ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_main, "src/main.py", _make_content("src/main.py", 1, seed), ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_utils, "src/utils.py", _make_content("src/utils.py", 1, seed), ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_config, "data/config.json", _make_content("data/config.json", 1, seed), ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_logo, "assets/logo.png", snap0.files["assets/logo.png"].content, ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_epoch, "src/epoch_test.py", _make_content("src/epoch_test.py", 0, seed), ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_deep, "a/b/c/d/e/f/g/deep.txt", _make_content("a/b/c/d/e/f/g/deep.txt", 0, seed), ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_corrupted_bin, "assets/corrupted.bin", null_content, ts[5], ts[5], 0o644),
+    )
+    snap5.add_file(
+        _TrackedFile(fid_secret, "restricted/secret.txt", _make_content("restricted/secret.txt", 0, seed), ts[5], ts[5], 0o000),
+    )
+    # Renamed + CRLF: same file_id, different path, CRLF content
+    snap5.add_file(
+        _TrackedFile(
+            fid_cross_plat,
+            "src/cross_plat.py",
+            _make_text("src/cross_platform.py", 0, seed).replace(b"\n", b"\r\n"),
+            ts[5], ts[5], 0o644,
+        ),
+    )
+    state.snapshots.append(snap5)
+    return state
 
 
 # ── Scenario dispatcher ──────────────────────────────────────────────────────

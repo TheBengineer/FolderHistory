@@ -1,0 +1,36 @@
+{
+  "machine": [
+    {
+      "op": "rename",
+      "old_path": "src/dumupu_renamed_v2.md",
+      "new_path": "src/dumupu_renamed_v2_copy.md",
+      "old_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024",
+      "new_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024"
+    },
+    {
+      "op": "modify",
+      "old_path": "zisidasu.md",
+      "new_path": "zisidasu.md",
+      "old_hash": "fe9346c976a95641d01fbafff793b6b9ca7940eba0f8bfe2f350e347ca1dd28f",
+      "new_hash": "91360a90946a04c773f6de031990593ecdda2470049f6bff52b072c76dfc89f9"
+    },
+    {
+      "op": "delete",
+      "old_path": "data/vayitaf.md",
+      "old_hash": "3c61f34a463f3faad3b3dfed088474b3644456c34a827dd6eccbadac2e6e1eb8"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/kid.md",
+      "old_hash": "a66235131d1df0d767b24992640842e4a324339dde22e5981dfdccc02c00a8ce"
+    },
+    {
+      "op": "modify",
+      "old_path": "ked.json",
+      "new_path": "ked.json",
+      "old_hash": "0e1a54c166b68a21d4cdd4fe7775575464e790289f71bdf686f9542a7eebef35",
+      "new_hash": "9367d8b900dc32711e4c7a8a044dbb0c8dfb87f7e7b61adb334d37a7cb63ac54"
+    }
+  ],
+  "human": "Snapshot: S9\nTimestamp: 1784227258.0833704\n\nChanges:\n  > src/dumupu_renamed_v2.md -> src/dumupu_renamed_v2_copy.md\n  ~ zisidasu.md (modified)\n  - data/vayitaf.md (deleted)\n  - src/kid.md (deleted)\n  ~ ked.json (modified)\n\n5 operations"
+}

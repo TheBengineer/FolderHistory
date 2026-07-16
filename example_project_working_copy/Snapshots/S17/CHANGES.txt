@@ -1,0 +1,31 @@
+{
+  "machine": [
+    {
+      "op": "modify",
+      "old_path": "src/pulas_copy_copy.toml",
+      "new_path": "src/pulas_copy_copy.toml",
+      "old_hash": "9541b7154de9ccff2d78bd19f064dffb38e0dbe88e8a263e1cac6a613411bada",
+      "new_hash": "36591732ed08223a907ea4ae718b4596723054381822a971af7fe39d40e2c232"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/waxocade_v2.md",
+      "old_hash": "d41c778c0b7cb7ebfab502e9bb4ce690424ab1916cb20daea7be6e4f0b4c3891"
+    },
+    {
+      "op": "rename",
+      "old_path": "data/ruyi.txt",
+      "new_path": "data/ruyi_moved.txt",
+      "old_hash": "e34d2f9d6e796112bfcdf7cfc7ee41aee51ab1bf65260a136c88c8fcc5dbd025",
+      "new_hash": "e34d2f9d6e796112bfcdf7cfc7ee41aee51ab1bf65260a136c88c8fcc5dbd025"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/zuqun_renamed.txt",
+      "new_path": "src/zuqun_renamed.txt",
+      "old_hash": "0b9df08bc9ab8bacaf7bbac4f777cefdca4276ad8900280a1ae20bfba89b4beb",
+      "new_hash": "d442a8246968d9eda3272944e7eec7a4064ca022eac3a057e81366e862116266"
+    }
+  ],
+  "human": "Snapshot: S17\nTimestamp: 1784227257.8756716\n\nChanges:\n  ~ src/pulas_copy_copy.toml (modified)\n  - src/waxocade_v2.md (deleted)\n  > data/ruyi.txt -> data/ruyi_moved.txt\n  ~ src/zuqun_renamed.txt (modified)\n\n4 operations"
+}

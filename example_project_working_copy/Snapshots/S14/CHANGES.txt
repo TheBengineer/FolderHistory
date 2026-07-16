@@ -1,0 +1,29 @@
+{
+  "machine": [
+    {
+      "op": "delete",
+      "old_path": "data/nezivola_renamed.md",
+      "old_hash": "40c82cd4c61fe668e48bf05bdef6b1c9c695a1cdc6f61756eea6c9e91a86fc1b"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/pulas_copy.toml",
+      "new_path": "src/pulas_copy_copy.toml",
+      "old_hash": "9541b7154de9ccff2d78bd19f064dffb38e0dbe88e8a263e1cac6a613411bada",
+      "new_hash": "9541b7154de9ccff2d78bd19f064dffb38e0dbe88e8a263e1cac6a613411bada"
+    },
+    {
+      "op": "rename",
+      "old_path": "wepodiy.py",
+      "new_path": "wepodiy_copy.py",
+      "old_hash": "fb3101a808e446abb971308e4790ba09570aae458e2928b556eccd48e19bc221",
+      "new_hash": "fb3101a808e446abb971308e4790ba09570aae458e2928b556eccd48e19bc221"
+    },
+    {
+      "op": "delete",
+      "old_path": "zisidasu.md",
+      "old_hash": "e6aae0a6915af46dace9b1bc90e570a5f39ffd56a0dfc45505c63b94a2921fdf"
+    }
+  ],
+  "human": "Snapshot: S14\nTimestamp: 1784227257.8355844\n\nChanges:\n  - data/nezivola_renamed.md (deleted)\n  > src/pulas_copy.toml -> src/pulas_copy_copy.toml\n  > wepodiy.py -> wepodiy_copy.py\n  - zisidasu.md (deleted)\n\n4 operations"
+}

@@ -1,0 +1,24 @@
+{
+  "machine": [
+    {
+      "op": "modify",
+      "old_path": "wepodiy_copy.py",
+      "new_path": "wepodiy_copy.py",
+      "old_hash": "fb3101a808e446abb971308e4790ba09570aae458e2928b556eccd48e19bc221",
+      "new_hash": "65158d1576ebfd213895bd2a02f6a314a4c555f1707759d2a891dd75b398e033"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/zuqun_renamed.txt",
+      "new_path": "src/zuqun_renamed_renamed.txt",
+      "old_hash": "d442a8246968d9eda3272944e7eec7a4064ca022eac3a057e81366e862116266",
+      "new_hash": "d442a8246968d9eda3272944e7eec7a4064ca022eac3a057e81366e862116266"
+    },
+    {
+      "op": "create",
+      "new_path": "qowuy/telo/bonoho/yubo/xadogoh/deep.txt",
+      "new_hash": "b3309f2675305ad7eccb4159808bc5a17917dffea1622ac6fcf315f882415354"
+    }
+  ],
+  "human": "Snapshot: S18\nTimestamp: 1784227257.8951337\n\nChanges:\n  ~ wepodiy_copy.py (modified)\n  > src/zuqun_renamed.txt -> src/zuqun_renamed_renamed.txt\n  + qowuy/telo/bonoho/yubo/xadogoh/deep.txt (created)\n\n3 operations"
+}

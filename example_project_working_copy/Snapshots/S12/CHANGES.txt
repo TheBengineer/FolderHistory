@@ -1,0 +1,29 @@
+{
+  "machine": [
+    {
+      "op": "delete",
+      "old_path": "src/dumupu_renamed_v2_copy_renamed.md",
+      "old_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024"
+    },
+    {
+      "op": "create",
+      "new_path": "wepodiy.py",
+      "new_hash": "fb3101a808e446abb971308e4790ba09570aae458e2928b556eccd48e19bc221"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/zuqun.txt",
+      "new_path": "src/zuqun.txt",
+      "old_hash": "6b33f27841641d52fc08e41a9970c92f31b3a536aa6a397a70c41cfb62cb3e7d",
+      "new_hash": "7015387e9f9f4545382a1f7399ad8453a7d3b45afe3fd288037ebe40fb2af8cf"
+    },
+    {
+      "op": "modify",
+      "old_path": "zisidasu.md",
+      "new_path": "zisidasu.md",
+      "old_hash": "91360a90946a04c773f6de031990593ecdda2470049f6bff52b072c76dfc89f9",
+      "new_hash": "e6aae0a6915af46dace9b1bc90e570a5f39ffd56a0dfc45505c63b94a2921fdf"
+    }
+  ],
+  "human": "Snapshot: S12\nTimestamp: 1784227257.8045535\n\nChanges:\n  - src/dumupu_renamed_v2_copy_renamed.md (deleted)\n  + wepodiy.py (created)\n  ~ src/zuqun.txt (modified)\n  ~ zisidasu.md (modified)\n\n4 operations"
+}

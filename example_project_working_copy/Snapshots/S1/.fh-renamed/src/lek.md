@@ -1,0 +1,1 @@
+../../src/lek_moved.md

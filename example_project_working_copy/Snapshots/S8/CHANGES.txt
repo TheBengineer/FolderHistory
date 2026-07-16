@@ -1,0 +1,37 @@
+{
+  "machine": [
+    {
+      "op": "delete",
+      "old_path": "docs/rilejifa_v2_copy.json",
+      "old_hash": "a58c392157054f23a92f6a21030e56191431f668b2690148080c29996423bd90"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/lozihi_renamed.txt",
+      "old_hash": "6eccda347a461c7fd25834bd180e58de2d75f7e95d515026f0f3a1047a6b599a"
+    },
+    {
+      "op": "create",
+      "new_path": "data/nezivola.md",
+      "new_hash": "8495b355fcc2dce9f71bfecf05aa4cbbf7fcff4a491885c05031abb49c88958d"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/pulas.toml",
+      "new_path": "src/pulas.toml",
+      "old_hash": "34949e5d5eb68feebe5b81683fd7a47ca6f9dbec62d7900e2604c6b0db629ae4",
+      "new_hash": "9541b7154de9ccff2d78bd19f064dffb38e0dbe88e8a263e1cac6a613411bada"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/nezoqog_renamed_v2_renamed.md",
+      "old_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30"
+    },
+    {
+      "op": "delete",
+      "old_path": "zaconake.py",
+      "old_hash": "cc1ca1d3cd3b571aba419feabce274163a15d375dfa608d587a1f13fca0136c4"
+    }
+  ],
+  "human": "Snapshot: S8\nTimestamp: 1784227258.0688717\n\nChanges:\n  - docs/rilejifa_v2_copy.json (deleted)\n  - src/lozihi_renamed.txt (deleted)\n  + data/nezivola.md (created)\n  ~ src/pulas.toml (modified)\n  - src/nezoqog_renamed_v2_renamed.md (deleted)\n  - zaconake.py (deleted)\n\n6 operations"
+}

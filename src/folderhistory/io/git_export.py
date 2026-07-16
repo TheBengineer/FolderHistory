@@ -59,19 +59,30 @@ def export_git(
                 store.store_file(src)
                 dest = output_dir / fr.path
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(str(src), str(dest))
+                try:
+                    shutil.copy2(str(src), str(dest))
+                except PermissionError:
+                    continue
         
         # git add -A
         _git(output_dir, "add", "-A")
         
-        # Build commit message
-        ops_summary: dict[str, int] = {}
+        # Build commit message with file-level details
+        ops_by_type: dict[str, list[str]] = {}
         for op in node.operations:
-            ops_summary[op.op_type] = ops_summary.get(op.op_type, 0) + 1
-        summary = ", ".join(f"{v} {k}" for k, v in sorted(ops_summary.items())) or "no changes"
-        msg = f"Snapshot: {node.snapshot_id}\n\n{summary}"
-        
-        # Commit
+            ops_by_type.setdefault(op.op_type, [])
+            path = op.target_path or op.source_path or op.file_id
+            if path not in ops_by_type[op.op_type]:
+                ops_by_type[op.op_type].append(path)
+        summary = ", ".join(f"{len(v)} {k}" for k, v in sorted(ops_by_type.items())) or "no changes"
+        details_list: list[str] = []
+        for op_type in ["create", "modify", "rename", "move", "delete", "copy"]:
+            if op_type in ops_by_type:
+                details_list.append(op_type.title() + ":")
+                for p in ops_by_type[op_type]:
+                    details_list.append("  " + p)
+        details = "\n" + "\n".join(details_list) if details_list else ""
+        msg = f"Snapshot: {node.snapshot_id}\n\n{summary}{details}"
         r = _git(output_dir, "commit", "-m", msg, "--allow-empty")
         if r.returncode != 0:
             continue

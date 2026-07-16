@@ -1,0 +1,4 @@
+{
+  "machine": [],
+  "human": "Snapshot: S0\nTimestamp: 1784227257.7386308\n\nChanges:\n\n0 operations"
+}

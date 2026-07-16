@@ -1,0 +1,766 @@
+{
+  "version": 1,
+  "format": "working-copy",
+  "snapshots": [
+    {
+      "id": "S0",
+      "timestamp": 1784227257.7386308,
+      "parent_id": null,
+      "op_count": 0
+    },
+    {
+      "id": "S1",
+      "timestamp": 1784227257.758511,
+      "parent_id": "S0",
+      "op_count": 5
+    },
+    {
+      "id": "S10",
+      "timestamp": 1784227257.7725203,
+      "parent_id": "S1",
+      "op_count": 13
+    },
+    {
+      "id": "S11",
+      "timestamp": 1784227257.7883925,
+      "parent_id": "S10",
+      "op_count": 4
+    },
+    {
+      "id": "S12",
+      "timestamp": 1784227257.8045535,
+      "parent_id": "S11",
+      "op_count": 4
+    },
+    {
+      "id": "S13",
+      "timestamp": 1784227257.8214672,
+      "parent_id": "S12",
+      "op_count": 3
+    },
+    {
+      "id": "S14",
+      "timestamp": 1784227257.8355844,
+      "parent_id": "S13",
+      "op_count": 4
+    },
+    {
+      "id": "S15",
+      "timestamp": 1784227257.8498476,
+      "parent_id": "S14",
+      "op_count": 1
+    },
+    {
+      "id": "S16",
+      "timestamp": 1784227257.8637133,
+      "parent_id": "S15",
+      "op_count": 2
+    },
+    {
+      "id": "S17",
+      "timestamp": 1784227257.8756716,
+      "parent_id": "S16",
+      "op_count": 4
+    },
+    {
+      "id": "S18",
+      "timestamp": 1784227257.8951337,
+      "parent_id": "S17",
+      "op_count": 3
+    },
+    {
+      "id": "S19",
+      "timestamp": 1784227257.9148722,
+      "parent_id": "S18",
+      "op_count": 3
+    },
+    {
+      "id": "S2",
+      "timestamp": 1784227257.9332793,
+      "parent_id": "S19",
+      "op_count": 13
+    },
+    {
+      "id": "S3",
+      "timestamp": 1784227257.9536839,
+      "parent_id": "S2",
+      "op_count": 5
+    },
+    {
+      "id": "S4",
+      "timestamp": 1784227257.9776134,
+      "parent_id": "S3",
+      "op_count": 4
+    },
+    {
+      "id": "S5",
+      "timestamp": 1784227258.0028422,
+      "parent_id": "S4",
+      "op_count": 6
+    },
+    {
+      "id": "S6",
+      "timestamp": 1784227258.0275915,
+      "parent_id": "S5",
+      "op_count": 7
+    },
+    {
+      "id": "S7",
+      "timestamp": 1784227258.0509903,
+      "parent_id": "S6",
+      "op_count": 6
+    },
+    {
+      "id": "S8",
+      "timestamp": 1784227258.0688717,
+      "parent_id": "S7",
+      "op_count": 6
+    },
+    {
+      "id": "S9",
+      "timestamp": 1784227258.0833704,
+      "parent_id": "S8",
+      "op_count": 5
+    }
+  ],
+  "operations": [
+    {
+      "op_type": "rename",
+      "file_id": "docs/rilejifa.json",
+      "snapshot_id": "S1",
+      "source_path": "docs/rilejifa.json",
+      "target_path": "docs/rilejifa_v2.json"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/lek.md",
+      "snapshot_id": "S1",
+      "source_path": "src/lek.md",
+      "target_path": "src/lek_moved.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/lozihi.txt",
+      "snapshot_id": "S1",
+      "source_path": "src/lozihi.txt",
+      "target_path": "src/lozihi_renamed.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/pulas.toml",
+      "snapshot_id": "S1",
+      "source_path": "src/pulas.toml",
+      "target_path": "src/pulas.toml"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/nezoqog.md",
+      "snapshot_id": "S1",
+      "target_path": "src/nezoqog.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "docs/rilejifa_v2.json",
+      "snapshot_id": "S10",
+      "source_path": "docs/rilejifa_v2.json"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/lek_moved.md",
+      "snapshot_id": "S10",
+      "source_path": "src/lek_moved.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/lozihi_renamed.txt",
+      "snapshot_id": "S10",
+      "source_path": "src/lozihi_renamed.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "data/nezivola.md",
+      "snapshot_id": "S10",
+      "target_path": "data/nezivola.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/dumupu.md",
+      "snapshot_id": "S10",
+      "source_path": "src/dumupu.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/dumupu_renamed_v2_copy.md",
+      "snapshot_id": "S10",
+      "target_path": "src/dumupu_renamed_v2_copy.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/pulas.toml",
+      "snapshot_id": "S10",
+      "source_path": "src/pulas.toml",
+      "target_path": "src/pulas.toml"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/waxocade.md",
+      "snapshot_id": "S10",
+      "source_path": "src/waxocade.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/waxocade_v2.md",
+      "snapshot_id": "S10",
+      "target_path": "src/waxocade_v2.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/nezoqog.md",
+      "snapshot_id": "S10",
+      "source_path": "src/nezoqog.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "zisidasu.md",
+      "snapshot_id": "S10",
+      "target_path": "zisidasu.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/juresul.py",
+      "snapshot_id": "S10",
+      "source_path": "src/juresul.py"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/kid.md",
+      "snapshot_id": "S10",
+      "source_path": "src/kid.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/dumupu_renamed_v2_copy.md",
+      "snapshot_id": "S11",
+      "source_path": "src/dumupu_renamed_v2_copy.md",
+      "target_path": "src/dumupu_renamed_v2_copy_renamed.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/pulas.toml",
+      "snapshot_id": "S11",
+      "source_path": "src/pulas.toml",
+      "target_path": "src/pulas_copy.toml"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/waxocade_v2.md",
+      "snapshot_id": "S11",
+      "source_path": "src/waxocade_v2.md",
+      "target_path": "src/waxocade_v2.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/zuqun.txt",
+      "snapshot_id": "S11",
+      "target_path": "src/zuqun.txt"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/dumupu_renamed_v2_copy_renamed.md",
+      "snapshot_id": "S12",
+      "source_path": "src/dumupu_renamed_v2_copy_renamed.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "wepodiy.py",
+      "snapshot_id": "S12",
+      "target_path": "wepodiy.py"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/zuqun.txt",
+      "snapshot_id": "S12",
+      "source_path": "src/zuqun.txt",
+      "target_path": "src/zuqun.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "zisidasu.md",
+      "snapshot_id": "S12",
+      "source_path": "zisidasu.md",
+      "target_path": "zisidasu.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "data/nezivola.md",
+      "snapshot_id": "S13",
+      "source_path": "data/nezivola.md",
+      "target_path": "data/nezivola_renamed.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "data/ruyi.txt",
+      "snapshot_id": "S13",
+      "target_path": "data/ruyi.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/zuqun.txt",
+      "snapshot_id": "S13",
+      "source_path": "src/zuqun.txt",
+      "target_path": "src/zuqun.txt"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "data/nezivola_renamed.md",
+      "snapshot_id": "S14",
+      "source_path": "data/nezivola_renamed.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/pulas_copy.toml",
+      "snapshot_id": "S14",
+      "source_path": "src/pulas_copy.toml",
+      "target_path": "src/pulas_copy_copy.toml"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "wepodiy.py",
+      "snapshot_id": "S14",
+      "source_path": "wepodiy.py",
+      "target_path": "wepodiy_copy.py"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "zisidasu.md",
+      "snapshot_id": "S14",
+      "source_path": "zisidasu.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/zuqun.txt",
+      "snapshot_id": "S15",
+      "source_path": "src/zuqun.txt",
+      "target_path": "src/zuqun_renamed.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/waxocade_v2.md",
+      "snapshot_id": "S16",
+      "source_path": "src/waxocade_v2.md",
+      "target_path": "src/waxocade_v2.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/zuqun_renamed.txt",
+      "snapshot_id": "S16",
+      "source_path": "src/zuqun_renamed.txt",
+      "target_path": "src/zuqun_renamed.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/pulas_copy_copy.toml",
+      "snapshot_id": "S17",
+      "source_path": "src/pulas_copy_copy.toml",
+      "target_path": "src/pulas_copy_copy.toml"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/waxocade_v2.md",
+      "snapshot_id": "S17",
+      "source_path": "src/waxocade_v2.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "data/ruyi.txt",
+      "snapshot_id": "S17",
+      "source_path": "data/ruyi.txt",
+      "target_path": "data/ruyi_moved.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/zuqun_renamed.txt",
+      "snapshot_id": "S17",
+      "source_path": "src/zuqun_renamed.txt",
+      "target_path": "src/zuqun_renamed.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "wepodiy_copy.py",
+      "snapshot_id": "S18",
+      "source_path": "wepodiy_copy.py",
+      "target_path": "wepodiy_copy.py"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/zuqun_renamed.txt",
+      "snapshot_id": "S18",
+      "source_path": "src/zuqun_renamed.txt",
+      "target_path": "src/zuqun_renamed_renamed.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "qowuy/telo/bonoho/yubo/xadogoh/deep.txt",
+      "snapshot_id": "S18",
+      "target_path": "qowuy/telo/bonoho/yubo/xadogoh/deep.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/pulas_copy_copy.toml",
+      "snapshot_id": "S19",
+      "source_path": "src/pulas_copy_copy.toml",
+      "target_path": "src/pulas_copy_copy.toml"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "data/ruyi_moved.txt",
+      "snapshot_id": "S19",
+      "source_path": "data/ruyi_moved.txt",
+      "target_path": "data/ruyi_moved.txt"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/zuqun_renamed_renamed.txt",
+      "snapshot_id": "S19",
+      "source_path": "src/zuqun_renamed_renamed.txt",
+      "target_path": "src/zuqun_renamed_renamed.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "docs/rilejifa_v2_copy.json",
+      "snapshot_id": "S2",
+      "target_path": "docs/rilejifa_v2_copy.json"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/lek_moved.md",
+      "snapshot_id": "S2",
+      "target_path": "src/lek_moved.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/lozihi_renamed.txt",
+      "snapshot_id": "S2",
+      "target_path": "src/lozihi_renamed.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/dumupu.md",
+      "snapshot_id": "S2",
+      "target_path": "src/dumupu.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/pulas_copy_copy.toml",
+      "snapshot_id": "S2",
+      "source_path": "src/pulas_copy_copy.toml"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/pulas.toml",
+      "snapshot_id": "S2",
+      "target_path": "src/pulas.toml"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/waxocade.md",
+      "snapshot_id": "S2",
+      "target_path": "src/waxocade.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "wepodiy_copy.py",
+      "snapshot_id": "S2",
+      "source_path": "wepodiy_copy.py"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "data/ruyi_moved.txt",
+      "snapshot_id": "S2",
+      "source_path": "data/ruyi_moved.txt"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/zuqun_renamed_renamed.txt",
+      "snapshot_id": "S2",
+      "source_path": "src/zuqun_renamed_renamed.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/nezoqog.md",
+      "snapshot_id": "S2",
+      "target_path": "src/nezoqog.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "qowuy/telo/bonoho/yubo/xadogoh/deep.txt",
+      "snapshot_id": "S2",
+      "source_path": "qowuy/telo/bonoho/yubo/xadogoh/deep.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "src/kid.md",
+      "snapshot_id": "S2",
+      "target_path": "src/kid.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "docs/rilejifa_v2_copy.json",
+      "snapshot_id": "S3",
+      "source_path": "docs/rilejifa_v2_copy.json",
+      "target_path": "docs/rilejifa_v2_copy.json"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/lek_moved.md",
+      "snapshot_id": "S3",
+      "source_path": "src/lek_moved.md",
+      "target_path": "src/lek_moved.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/pulas.toml",
+      "snapshot_id": "S3",
+      "source_path": "src/pulas.toml",
+      "target_path": "src/pulas.toml"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/waxocade.md",
+      "snapshot_id": "S3",
+      "source_path": "src/waxocade.md",
+      "target_path": "src/waxocade_v2.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "data/vayitaf.md",
+      "snapshot_id": "S3",
+      "target_path": "data/vayitaf.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/lek_moved.md",
+      "snapshot_id": "S4",
+      "source_path": "src/lek_moved.md",
+      "target_path": "src/lek_moved_renamed.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/dumupu.md",
+      "snapshot_id": "S4",
+      "source_path": "src/dumupu.md",
+      "target_path": "src/dumupu.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/nezoqog.md",
+      "snapshot_id": "S4",
+      "source_path": "src/nezoqog.md",
+      "target_path": "src/nezoqog_renamed.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "ked.json",
+      "snapshot_id": "S4",
+      "target_path": "ked.json"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "docs/rilejifa_v2_copy.json",
+      "snapshot_id": "S5",
+      "source_path": "docs/rilejifa_v2_copy.json",
+      "target_path": "docs/rilejifa_v2_copy.json"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/lozihi_renamed.txt",
+      "snapshot_id": "S5",
+      "source_path": "src/lozihi_renamed.txt",
+      "target_path": "src/lozihi_renamed.txt"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/dumupu.md",
+      "snapshot_id": "S5",
+      "source_path": "src/dumupu.md",
+      "target_path": "src/dumupu_renamed.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/nezoqog_renamed.md",
+      "snapshot_id": "S5",
+      "source_path": "src/nezoqog_renamed.md",
+      "target_path": "src/nezoqog_renamed_v2.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "zaconake.py",
+      "snapshot_id": "S5",
+      "target_path": "zaconake.py"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "ked.json",
+      "snapshot_id": "S5",
+      "source_path": "ked.json",
+      "target_path": "ked.json"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "docs/rilejifa_v2_copy.json",
+      "snapshot_id": "S6",
+      "source_path": "docs/rilejifa_v2_copy.json",
+      "target_path": "docs/rilejifa_v2_copy.json"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/lek_moved_renamed.md",
+      "snapshot_id": "S6",
+      "source_path": "src/lek_moved_renamed.md",
+      "target_path": "src/lek_moved_renamed_v2.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/lozihi_renamed.txt",
+      "snapshot_id": "S6",
+      "source_path": "src/lozihi_renamed.txt",
+      "target_path": "src/lozihi_renamed.txt"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/nezoqog_renamed_v2.md",
+      "snapshot_id": "S6",
+      "source_path": "src/nezoqog_renamed_v2.md",
+      "target_path": "src/nezoqog_renamed_v2_renamed.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/kid.md",
+      "snapshot_id": "S6",
+      "source_path": "src/kid.md",
+      "target_path": "src/kid.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "mecu.md",
+      "snapshot_id": "S6",
+      "target_path": "mecu.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "ked.json",
+      "snapshot_id": "S6",
+      "source_path": "ked.json",
+      "target_path": "ked.json"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/lek_moved_renamed_v2.md",
+      "snapshot_id": "S7",
+      "source_path": "src/lek_moved_renamed_v2.md"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/dumupu_renamed.md",
+      "snapshot_id": "S7",
+      "source_path": "src/dumupu_renamed.md",
+      "target_path": "src/dumupu_renamed_v2.md"
+    },
+    {
+      "op_type": "create",
+      "file_id": "zisidasu.md",
+      "snapshot_id": "S7",
+      "target_path": "zisidasu.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "data/vayitaf.md",
+      "snapshot_id": "S7",
+      "source_path": "data/vayitaf.md",
+      "target_path": "data/vayitaf.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/kid.md",
+      "snapshot_id": "S7",
+      "source_path": "src/kid.md",
+      "target_path": "src/kid.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "mecu.md",
+      "snapshot_id": "S7",
+      "source_path": "mecu.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "docs/rilejifa_v2_copy.json",
+      "snapshot_id": "S8",
+      "source_path": "docs/rilejifa_v2_copy.json"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/lozihi_renamed.txt",
+      "snapshot_id": "S8",
+      "source_path": "src/lozihi_renamed.txt"
+    },
+    {
+      "op_type": "create",
+      "file_id": "data/nezivola.md",
+      "snapshot_id": "S8",
+      "target_path": "data/nezivola.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "src/pulas.toml",
+      "snapshot_id": "S8",
+      "source_path": "src/pulas.toml",
+      "target_path": "src/pulas.toml"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/nezoqog_renamed_v2_renamed.md",
+      "snapshot_id": "S8",
+      "source_path": "src/nezoqog_renamed_v2_renamed.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "zaconake.py",
+      "snapshot_id": "S8",
+      "source_path": "zaconake.py"
+    },
+    {
+      "op_type": "rename",
+      "file_id": "src/dumupu_renamed_v2.md",
+      "snapshot_id": "S9",
+      "source_path": "src/dumupu_renamed_v2.md",
+      "target_path": "src/dumupu_renamed_v2_copy.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "zisidasu.md",
+      "snapshot_id": "S9",
+      "source_path": "zisidasu.md",
+      "target_path": "zisidasu.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "data/vayitaf.md",
+      "snapshot_id": "S9",
+      "source_path": "data/vayitaf.md"
+    },
+    {
+      "op_type": "delete",
+      "file_id": "src/kid.md",
+      "snapshot_id": "S9",
+      "source_path": "src/kid.md"
+    },
+    {
+      "op_type": "modify",
+      "file_id": "ked.json",
+      "snapshot_id": "S9",
+      "source_path": "ked.json",
+      "target_path": "ked.json"
+    }
+  ]
+}

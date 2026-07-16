@@ -1,0 +1,72 @@
+{
+  "machine": [
+    {
+      "op": "delete",
+      "old_path": "docs/rilejifa_v2.json",
+      "old_hash": "05b1b541dea7e49cf2144b4dce374f6a5b69e211c9c83014d7d7ddff49ba4c7f"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/lek_moved.md",
+      "old_hash": "219a34bbc99577a02c69263991c586cfcbaa18bf2816017ed0a04b5f8ab1dec9"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/lozihi_renamed.txt",
+      "old_hash": "bd89050af1522426d01ef976df668c41783e549a69074cbac22ddd177c51ef0f"
+    },
+    {
+      "op": "create",
+      "new_path": "data/nezivola.md",
+      "new_hash": "40c82cd4c61fe668e48bf05bdef6b1c9c695a1cdc6f61756eea6c9e91a86fc1b"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/dumupu.md",
+      "old_hash": "706c3349e453ac306f368cd31b63f066bc3db51e20a96552410563dc97c187a1"
+    },
+    {
+      "op": "create",
+      "new_path": "src/dumupu_renamed_v2_copy.md",
+      "new_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/pulas.toml",
+      "new_path": "src/pulas.toml",
+      "old_hash": "3bb6c158351add3b2433b95af0ff2de720104a3a7e7626bc84114137b25a4cb2",
+      "new_hash": "9541b7154de9ccff2d78bd19f064dffb38e0dbe88e8a263e1cac6a613411bada"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/waxocade.md",
+      "old_hash": "d12022bb07595b30192f969ab0c5355df39f0ca7c6d08c5720dde2c55bcf315c"
+    },
+    {
+      "op": "create",
+      "new_path": "src/waxocade_v2.md",
+      "new_hash": "2fff5beb239b8f577a1f2fb09449af7982550835a3f8e708b9699962b5294e52"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/nezoqog.md",
+      "old_hash": "289f2d88c05e58d8311fe93bea2fe9e650cd645a7fc51c70ddd66dff989d5559"
+    },
+    {
+      "op": "create",
+      "new_path": "zisidasu.md",
+      "new_hash": "91360a90946a04c773f6de031990593ecdda2470049f6bff52b072c76dfc89f9"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/juresul.py",
+      "old_hash": "b5ca863d28bed0163fe0652e5ffe38fae814e92afa18e77498695a9505a5d7cd"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/kid.md",
+      "old_hash": "d8aea3854ec96514275d180db48d83d446230d717df4c4a5f14492b9559c42f3"
+    }
+  ],
+  "human": "Snapshot: S10\nTimestamp: 1784227257.7725203\n\nChanges:\n  - docs/rilejifa_v2.json (deleted)\n  - src/lek_moved.md (deleted)\n  - src/lozihi_renamed.txt (deleted)\n  + data/nezivola.md (created)\n  - src/dumupu.md (deleted)\n  + src/dumupu_renamed_v2_copy.md (created)\n  ~ src/pulas.toml (modified)\n  - src/waxocade.md (deleted)\n  + src/waxocade_v2.md (created)\n  - src/nezoqog.md (deleted)\n  + zisidasu.md (created)\n  - src/juresul.py (deleted)\n  - src/kid.md (deleted)\n\n13 operations"
+}

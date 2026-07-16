@@ -1,0 +1,24 @@
+{
+  "machine": [
+    {
+      "op": "rename",
+      "old_path": "data/nezivola.md",
+      "new_path": "data/nezivola_renamed.md",
+      "old_hash": "40c82cd4c61fe668e48bf05bdef6b1c9c695a1cdc6f61756eea6c9e91a86fc1b",
+      "new_hash": "40c82cd4c61fe668e48bf05bdef6b1c9c695a1cdc6f61756eea6c9e91a86fc1b"
+    },
+    {
+      "op": "create",
+      "new_path": "data/ruyi.txt",
+      "new_hash": "e34d2f9d6e796112bfcdf7cfc7ee41aee51ab1bf65260a136c88c8fcc5dbd025"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/zuqun.txt",
+      "new_path": "src/zuqun.txt",
+      "old_hash": "7015387e9f9f4545382a1f7399ad8453a7d3b45afe3fd288037ebe40fb2af8cf",
+      "new_hash": "aebf2438431edf95e2db19e034c790a3beb0f6b2f0efccca52901e48c8727c15"
+    }
+  ],
+  "human": "Snapshot: S13\nTimestamp: 1784227257.8214672\n\nChanges:\n  > data/nezivola.md -> data/nezivola_renamed.md\n  + data/ruyi.txt (created)\n  ~ src/zuqun.txt (modified)\n\n3 operations"
+}

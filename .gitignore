@@ -37,3 +37,7 @@ Thumbs.db
 # Project-specific
 *.blake3
 *.xxhash
+example_project/
+example_large/
+example_large_working_copy/
+example_project_git/

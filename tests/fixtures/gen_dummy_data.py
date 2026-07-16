@@ -1189,3 +1189,213 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ── Random scenario generator ──────────────────────────────────────────────
+
+
+def _generate_random(
+    num_snapshots: int,
+    seed: int,
+    *,
+    file_count: int = 8,
+    p_create: float = 0.3,
+    p_modify: float = 0.3,
+    p_delete: float = 0.15,
+    p_rename: float = 0.1,
+    p_corrupt_time: float = 0.05,
+    p_corrupt_binary: float = 0.05,
+    p_nesting: float = 0.03,
+    p_permission_error: float = 0.02,
+) -> _GeneratorState:
+    """Generate random snapshot sequence from configurable operation probabilities.
+
+    Parameters
+    ----------
+    num_snapshots: Number of snapshots to generate.
+    seed: RNG seed for reproducibility.
+    file_count: Number of base files in S0.
+    p_create: Probability of creating a new file between snapshots.
+    p_modify: Probability of modifying an existing file.
+    p_delete: Probability of deleting a file.
+    p_rename: Probability of renaming a file.
+    p_corrupt_time: Probability of zeroing/setting epoch timestamps.
+    p_corrupt_binary: Probability of injecting binary content.
+    p_nesting: Probability of creating deeply nested directories.
+    p_permission_error: Probability of setting 0o000 permissions.
+    """
+    rng = random.Random(seed)
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "random"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+    state.timestamps = [
+        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
+    ]
+
+    # File identity tracking
+    file_ids: dict[str, str] = {}  # logical name → file_id
+    next_file_num: int = 0
+
+    def _next_fid() -> str:
+        nonlocal next_file_num
+        name = f"random_file_{next_file_num}"
+        next_file_num += 1
+        return name
+
+    # S0: Create initial random file set
+    snap0 = _SnapshotState()
+    paths_available: list[str] = []
+    paths_in_snapshot: set[str] = set()
+    file_names: list[str] = []
+
+    in_dirs = ["src", "docs", "data", ""]
+    for i in range(file_count):
+        d = rng.choice(in_dirs)
+        fname = f"{_random_word(rng)}.{rng.choice(['py','md','txt','json','toml','yaml'])}"
+        path = f"{d}/{fname}" if d else fname
+        fname_logical = _next_fid()
+        fid = _make_fid(fname_logical, seed)
+        file_ids[fname_logical] = fid
+        content = _make_content(path, 0, seed)
+        ts = int(state.timestamps[0] * _NS_IN_SEC)
+        snap0.add_file(_TrackedFile(fid, path, content, ts, ts, 0o644))
+        paths_available.append(path)
+        paths_in_snapshot.add(path)
+        file_names.append(fname_logical)
+    state.snapshots.append(snap0)
+
+    if num_snapshots < 2:
+        return state
+
+    # S1..SN: Randomly apply operations
+    for i in range(1, num_snapshots):
+        prev_snap = state.snapshots[-1]
+        new_snap = _SnapshotState()
+        ts = int(state.timestamps[i] * _NS_IN_SEC)
+
+        # Roll to see what happens to each file in the current snapshot
+        files_prev = list(prev_snap.files.items())
+        rng.shuffle(files_prev)
+
+        deleted: set[str] = set()
+        renamed_map: dict[str, str] = {}  # old_path → new_path
+
+        for path, tf in files_prev:
+            roll = rng.random()
+
+            if roll < p_delete and len(new_snap.files) > 2:
+                # DELETE — file is gone
+                deleted.add(path)
+                continue
+
+            elif roll < p_delete + p_rename:
+                # RENAME — new path, same file_id, same content level
+                base = Path(path).stem
+                ext = Path(path).suffix
+                parent = Path(path).parent
+                new_name = f"{base}_{rng.choice(['v2','copy','moved','renamed'])}{ext}"
+                new_path = str(parent / new_name) if str(parent) != "." else new_name
+                # Make sure we haven't used this path yet
+                attempt = 0
+                while new_path in [p for p, _ in files_prev] or new_path in renamed_map.values() or new_path in [f.path for f in new_snap.files.values()]:
+                    new_name = f"{base}_{rng.choice(['alt','backup','revised','variant','mirror'])}{ext}"
+                    new_path = str(parent / new_name) if str(parent) != "." else new_name
+                    attempt += 1
+                    if attempt > 5:
+                        new_path = path
+                        break
+                renamed_map[path] = new_path
+                new_snap.add_file(_TrackedFile(tf.file_id, new_path, tf.content, ts, ts, tf.mode))
+                continue
+
+            elif roll < p_delete + p_rename + p_modify:
+                # MODIFY — advance version (content evolves by snapshot index)
+                version = i
+                new_content = _make_content(path, version + i, seed)
+                new_snap.add_file(_TrackedFile(tf.file_id, path, new_content, ts, ts, tf.mode))
+                continue
+
+            else:
+                # UNCHANGED — keep as-is
+                new_snap.add_file(tf)
+                continue
+
+        # Apply timestamps for deleted files (log their deletion)
+        for d in deleted:
+            _ = d  # deleted file — just not in new_snap
+
+        # Apply renames (already handled above via renamed_map)
+
+        # MAYBE CREATE one or more new files
+        p_create_snapshot = p_create * rng.randint(1, 3)
+        if rng.random() < p_create_snapshot:
+            new_fname = _next_fid()
+            new_fid = _make_fid(new_fname, seed)
+            file_ids[new_fname] = new_fid
+            d = rng.choice(in_dirs)
+            ext = rng.choice(['py','md','txt','json'])
+            fname = f"{_random_word(rng)}.{ext}"
+            path = f"{d}/{fname}" if d else fname
+            content = _make_content(path, 0, seed + i)
+            new_snap.add_file(_TrackedFile(new_fid, path, content, ts, ts, 0o644))
+            paths_available.append(path)
+
+        # MAYBE corrupt timestamps (set to epoch)
+        if rng.random() < p_corrupt_time:
+            files_list = list(new_snap.files.items())
+            if files_list:
+                target_path, target_tf = rng.choice(files_list)
+                new_snap.files[target_path] = _TrackedFile(
+                    target_tf.file_id, target_path, target_tf.content, 0, ts, target_tf.mode,
+                )
+
+        # MAYBE corrupt with binary content
+        if rng.random() < p_corrupt_binary:
+            files_list = list(new_snap.files.items())
+            if files_list:
+                target_path, target_tf = rng.choice(files_list)
+                if not target_tf.content.startswith(b"\x00"):
+                    bin_content = bytes(rng.randint(0, 255) for _ in range(rng.randint(16, 64)))
+                    new_snap.files[target_path] = _TrackedFile(
+                        target_tf.file_id, target_path, bin_content, ts, ts, target_tf.mode,
+                    )
+
+        # MAYBE add deeply nested file
+        if rng.random() < p_nesting:
+            depth = rng.randint(3, 7)
+            nested_path = "/".join([_random_word(rng) for _ in range(depth)]) + "/deep.txt"
+            nested_fid = _make_fid(f"nested_{i}_{rng.randint(0,999)}", seed)
+            content = _make_content(nested_path, 0, seed)
+            new_snap.add_file(_TrackedFile(nested_fid, nested_path, content, ts, ts, 0o644))
+
+        # MAYBE set permission error (0o000)
+        if rng.random() < p_permission_error:
+            files_list = list(new_snap.files.items())
+            if files_list:
+                target_path, target_tf = rng.choice(files_list)
+                new_snap.files[target_path] = _TrackedFile(
+                    target_tf.file_id, target_path, target_tf.content, ts, ts, 0o000,
+                )
+
+        state.snapshots.append(new_snap)
+
+    return state
+
+
+def _random_word(rng: random.Random) -> str:
+    """Generate a random-ish filename component."""
+    consonants = "bcdfghjklmnpqrstvwxyz"
+    vowels = "aeiou"
+    length = rng.randint(3, 8)
+    chars = []
+    for i in range(length):
+        chars.append(rng.choice(consonants if i % 2 == 0 else vowels))
+    return "".join(chars)
+
+
+# ── Register random scenario ───────────────────────────────────────────────
+
+_GENERATORS["random"] = _generate_random
+SCENARIO_DEFAULTS["random"] = 5

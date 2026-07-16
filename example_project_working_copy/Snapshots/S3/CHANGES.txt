@@ -1,0 +1,38 @@
+{
+  "machine": [
+    {
+      "op": "modify",
+      "old_path": "docs/rilejifa_v2_copy.json",
+      "new_path": "docs/rilejifa_v2_copy.json",
+      "old_hash": "05b1b541dea7e49cf2144b4dce374f6a5b69e211c9c83014d7d7ddff49ba4c7f",
+      "new_hash": "83e7bf44cd78ea04151f0df173938ee3758e3473ff881da9b8227ed27b962ae9"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/lek_moved.md",
+      "new_path": "src/lek_moved.md",
+      "old_hash": "219a34bbc99577a02c69263991c586cfcbaa18bf2816017ed0a04b5f8ab1dec9",
+      "new_hash": "caebf7e6e4c4d3f8336d1cc6b43523b36ce89f5a695ff181b8915267b216d2c4"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/pulas.toml",
+      "new_path": "src/pulas.toml",
+      "old_hash": "61eb72356790b1a108e978c0ebfd1ea32f847eccf747d07055cc0fcb70b3e19a",
+      "new_hash": "34949e5d5eb68feebe5b81683fd7a47ca6f9dbec62d7900e2604c6b0db629ae4"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/waxocade.md",
+      "new_path": "src/waxocade_v2.md",
+      "old_hash": "2fff5beb239b8f577a1f2fb09449af7982550835a3f8e708b9699962b5294e52",
+      "new_hash": "2fff5beb239b8f577a1f2fb09449af7982550835a3f8e708b9699962b5294e52"
+    },
+    {
+      "op": "create",
+      "new_path": "data/vayitaf.md",
+      "new_hash": "442d9f23d17444edc1db4b7361596b171f8ce2472dfbaa92c88d98ab90851d78"
+    }
+  ],
+  "human": "Snapshot: S3\nTimestamp: 1784227257.9536839\n\nChanges:\n  ~ docs/rilejifa_v2_copy.json (modified)\n  ~ src/lek_moved.md (modified)\n  ~ src/pulas.toml (modified)\n  > src/waxocade.md -> src/waxocade_v2.md\n  + data/vayitaf.md (created)\n\n5 operations"
+}

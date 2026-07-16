@@ -1,0 +1,38 @@
+{
+  "machine": [
+    {
+      "op": "rename",
+      "old_path": "docs/rilejifa.json",
+      "new_path": "docs/rilejifa_v2.json",
+      "old_hash": "05b1b541dea7e49cf2144b4dce374f6a5b69e211c9c83014d7d7ddff49ba4c7f",
+      "new_hash": "05b1b541dea7e49cf2144b4dce374f6a5b69e211c9c83014d7d7ddff49ba4c7f"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/lek.md",
+      "new_path": "src/lek_moved.md",
+      "old_hash": "219a34bbc99577a02c69263991c586cfcbaa18bf2816017ed0a04b5f8ab1dec9",
+      "new_hash": "219a34bbc99577a02c69263991c586cfcbaa18bf2816017ed0a04b5f8ab1dec9"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/lozihi.txt",
+      "new_path": "src/lozihi_renamed.txt",
+      "old_hash": "bd89050af1522426d01ef976df668c41783e549a69074cbac22ddd177c51ef0f",
+      "new_hash": "bd89050af1522426d01ef976df668c41783e549a69074cbac22ddd177c51ef0f"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/pulas.toml",
+      "new_path": "src/pulas.toml",
+      "old_hash": "59da2b76916781a7a2f8b0f76bf26c3756ed70dbe30518791202fa3eee67579d",
+      "new_hash": "3bb6c158351add3b2433b95af0ff2de720104a3a7e7626bc84114137b25a4cb2"
+    },
+    {
+      "op": "create",
+      "new_path": "src/nezoqog.md",
+      "new_hash": "289f2d88c05e58d8311fe93bea2fe9e650cd645a7fc51c70ddd66dff989d5559"
+    }
+  ],
+  "human": "Snapshot: S1\nTimestamp: 1784227257.758511\n\nChanges:\n  > docs/rilejifa.json -> docs/rilejifa_v2.json\n  > src/lek.md -> src/lek_moved.md\n  > src/lozihi.txt -> src/lozihi_renamed.txt\n  ~ src/pulas.toml (modified)\n  + src/nezoqog.md (created)\n\n5 operations"
+}

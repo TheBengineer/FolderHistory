@@ -1,0 +1,19 @@
+{
+  "machine": [
+    {
+      "op": "modify",
+      "old_path": "src/waxocade_v2.md",
+      "new_path": "src/waxocade_v2.md",
+      "old_hash": "06d0113f380a90c416d8591232c3dfcd6b7cfcf1a49e9ccadf29ea41f7a98973",
+      "new_hash": "d41c778c0b7cb7ebfab502e9bb4ce690424ab1916cb20daea7be6e4f0b4c3891"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/zuqun_renamed.txt",
+      "new_path": "src/zuqun_renamed.txt",
+      "old_hash": "aebf2438431edf95e2db19e034c790a3beb0f6b2f0efccca52901e48c8727c15",
+      "new_hash": "0b9df08bc9ab8bacaf7bbac4f777cefdca4276ad8900280a1ae20bfba89b4beb"
+    }
+  ],
+  "human": "Snapshot: S16\nTimestamp: 1784227257.8637133\n\nChanges:\n  ~ src/waxocade_v2.md (modified)\n  ~ src/zuqun_renamed.txt (modified)\n\n2 operations"
+}

@@ -1,0 +1,45 @@
+{
+  "machine": [
+    {
+      "op": "modify",
+      "old_path": "docs/rilejifa_v2_copy.json",
+      "new_path": "docs/rilejifa_v2_copy.json",
+      "old_hash": "83e7bf44cd78ea04151f0df173938ee3758e3473ff881da9b8227ed27b962ae9",
+      "new_hash": "0d4dd371ba78ff819f7fa3fa6c7703218bd6b4e4f778da1560c06f9fe71ac34c"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/lozihi_renamed.txt",
+      "new_path": "src/lozihi_renamed.txt",
+      "old_hash": "bd89050af1522426d01ef976df668c41783e549a69074cbac22ddd177c51ef0f",
+      "new_hash": "bb00ff0baa916aca1a25d1c2fa5a6e5bde347a29c53c02cb3f8d3f980531d2a2"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/dumupu.md",
+      "new_path": "src/dumupu_renamed.md",
+      "old_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024",
+      "new_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/nezoqog_renamed.md",
+      "new_path": "src/nezoqog_renamed_v2.md",
+      "old_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30",
+      "new_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30"
+    },
+    {
+      "op": "create",
+      "new_path": "zaconake.py",
+      "new_hash": "cc1ca1d3cd3b571aba419feabce274163a15d375dfa608d587a1f13fca0136c4"
+    },
+    {
+      "op": "modify",
+      "old_path": "ked.json",
+      "new_path": "ked.json",
+      "old_hash": "de31d9fa158c9e4674b889b9895592e64187b955cf5e13a32eeb83110daea362",
+      "new_hash": "87f3f494563efc0713d41134b69b1b2caf7081208aa4c5fab9739ae2c706e6b6"
+    }
+  ],
+  "human": "Snapshot: S5\nTimestamp: 1784227258.0028422\n\nChanges:\n  ~ docs/rilejifa_v2_copy.json (modified)\n  ~ src/lozihi_renamed.txt (modified)\n  > src/dumupu.md -> src/dumupu_renamed.md\n  > src/nezoqog_renamed.md -> src/nezoqog_renamed_v2.md\n  + zaconake.py (created)\n  ~ ked.json (modified)\n\n6 operations"
+}

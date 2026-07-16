@@ -1,0 +1,70 @@
+{
+  "machine": [
+    {
+      "op": "create",
+      "new_path": "docs/rilejifa_v2_copy.json",
+      "new_hash": "05b1b541dea7e49cf2144b4dce374f6a5b69e211c9c83014d7d7ddff49ba4c7f"
+    },
+    {
+      "op": "create",
+      "new_path": "src/lek_moved.md",
+      "new_hash": "219a34bbc99577a02c69263991c586cfcbaa18bf2816017ed0a04b5f8ab1dec9"
+    },
+    {
+      "op": "create",
+      "new_path": "src/lozihi_renamed.txt",
+      "new_hash": "bd89050af1522426d01ef976df668c41783e549a69074cbac22ddd177c51ef0f"
+    },
+    {
+      "op": "create",
+      "new_path": "src/dumupu.md",
+      "new_hash": "706c3349e453ac306f368cd31b63f066bc3db51e20a96552410563dc97c187a1"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/pulas_copy_copy.toml",
+      "old_hash": "a86e330040c7272f106f7f874bf159e7480635104862c0ad84f63cef4a8df5d5"
+    },
+    {
+      "op": "create",
+      "new_path": "src/pulas.toml",
+      "new_hash": "61eb72356790b1a108e978c0ebfd1ea32f847eccf747d07055cc0fcb70b3e19a"
+    },
+    {
+      "op": "create",
+      "new_path": "src/waxocade.md",
+      "new_hash": "2fff5beb239b8f577a1f2fb09449af7982550835a3f8e708b9699962b5294e52"
+    },
+    {
+      "op": "delete",
+      "old_path": "wepodiy_copy.py",
+      "old_hash": "65158d1576ebfd213895bd2a02f6a314a4c555f1707759d2a891dd75b398e033"
+    },
+    {
+      "op": "delete",
+      "old_path": "data/ruyi_moved.txt",
+      "old_hash": "729f0960db2468de502db17835179e4b89a0c38e371990f91de130ad6c88b327"
+    },
+    {
+      "op": "delete",
+      "old_path": "src/zuqun_renamed_renamed.txt",
+      "old_hash": "aa507234c47ecb2399d9b44c56669a38e43d9ee13b4084438a911243aa999b6d"
+    },
+    {
+      "op": "create",
+      "new_path": "src/nezoqog.md",
+      "new_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30"
+    },
+    {
+      "op": "delete",
+      "old_path": "qowuy/telo/bonoho/yubo/xadogoh/deep.txt",
+      "old_hash": "b3309f2675305ad7eccb4159808bc5a17917dffea1622ac6fcf315f882415354"
+    },
+    {
+      "op": "create",
+      "new_path": "src/kid.md",
+      "new_hash": "d8aea3854ec96514275d180db48d83d446230d717df4c4a5f14492b9559c42f3"
+    }
+  ],
+  "human": "Snapshot: S2\nTimestamp: 1784227257.9332793\n\nChanges:\n  + docs/rilejifa_v2_copy.json (created)\n  + src/lek_moved.md (created)\n  + src/lozihi_renamed.txt (created)\n  + src/dumupu.md (created)\n  - src/pulas_copy_copy.toml (deleted)\n  + src/pulas.toml (created)\n  + src/waxocade.md (created)\n  - wepodiy_copy.py (deleted)\n  - data/ruyi_moved.txt (deleted)\n  - src/zuqun_renamed_renamed.txt (deleted)\n  + src/nezoqog.md (created)\n  - qowuy/telo/bonoho/yubo/xadogoh/deep.txt (deleted)\n  + src/kid.md (created)\n\n13 operations"
+}

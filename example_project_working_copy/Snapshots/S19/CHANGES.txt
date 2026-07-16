@@ -1,0 +1,26 @@
+{
+  "machine": [
+    {
+      "op": "modify",
+      "old_path": "src/pulas_copy_copy.toml",
+      "new_path": "src/pulas_copy_copy.toml",
+      "old_hash": "36591732ed08223a907ea4ae718b4596723054381822a971af7fe39d40e2c232",
+      "new_hash": "a86e330040c7272f106f7f874bf159e7480635104862c0ad84f63cef4a8df5d5"
+    },
+    {
+      "op": "modify",
+      "old_path": "data/ruyi_moved.txt",
+      "new_path": "data/ruyi_moved.txt",
+      "old_hash": "e34d2f9d6e796112bfcdf7cfc7ee41aee51ab1bf65260a136c88c8fcc5dbd025",
+      "new_hash": "729f0960db2468de502db17835179e4b89a0c38e371990f91de130ad6c88b327"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/zuqun_renamed_renamed.txt",
+      "new_path": "src/zuqun_renamed_renamed.txt",
+      "old_hash": "d442a8246968d9eda3272944e7eec7a4064ca022eac3a057e81366e862116266",
+      "new_hash": "aa507234c47ecb2399d9b44c56669a38e43d9ee13b4084438a911243aa999b6d"
+    }
+  ],
+  "human": "Snapshot: S19\nTimestamp: 1784227257.9148722\n\nChanges:\n  ~ src/pulas_copy_copy.toml (modified)\n  ~ data/ruyi_moved.txt (modified)\n  ~ src/zuqun_renamed_renamed.txt (modified)\n\n3 operations"
+}

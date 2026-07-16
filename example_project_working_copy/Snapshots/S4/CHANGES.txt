@@ -1,0 +1,31 @@
+{
+  "machine": [
+    {
+      "op": "rename",
+      "old_path": "src/lek_moved.md",
+      "new_path": "src/lek_moved_renamed.md",
+      "old_hash": "caebf7e6e4c4d3f8336d1cc6b43523b36ce89f5a695ff181b8915267b216d2c4",
+      "new_hash": "caebf7e6e4c4d3f8336d1cc6b43523b36ce89f5a695ff181b8915267b216d2c4"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/dumupu.md",
+      "new_path": "src/dumupu.md",
+      "old_hash": "706c3349e453ac306f368cd31b63f066bc3db51e20a96552410563dc97c187a1",
+      "new_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024"
+    },
+    {
+      "op": "rename",
+      "old_path": "src/nezoqog.md",
+      "new_path": "src/nezoqog_renamed.md",
+      "old_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30",
+      "new_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30"
+    },
+    {
+      "op": "create",
+      "new_path": "ked.json",
+      "new_hash": "de31d9fa158c9e4674b889b9895592e64187b955cf5e13a32eeb83110daea362"
+    }
+  ],
+  "human": "Snapshot: S4\nTimestamp: 1784227257.9776134\n\nChanges:\n  > src/lek_moved.md -> src/lek_moved_renamed.md\n  ~ src/dumupu.md (modified)\n  > src/nezoqog.md -> src/nezoqog_renamed.md\n  + ked.json (created)\n\n4 operations"
+}

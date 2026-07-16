@@ -320,6 +320,12 @@ def _format_timeline(timeline: Timeline, fmt: str) -> str:
         return format_gitlog(timeline)
     if fmt == "jsonlines":
         return format_jsonlines(timeline)
+    if fmt == "working-copy":
+        from folderhistory.io.working_copy import export_working_copy
+        import tempfile
+        td = tempfile.mkdtemp(prefix="fh_wc_")
+        result = export_working_copy(timeline, {}, Path(td))
+        return f"Working copy exported to {result}"
     return format_json(timeline)
 
 

@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "folderhistory"
+version = "0.1.0"
+description = "Reconstruct git-like version history from messy folder backups"
+requires-python = ">=3.12"
+dependencies = [
+    "blake3>=1.0.9",
+    "xxhash>=3.5",
+    "typer>=0.12",
+    "orjson>=3.10",
+    "scipy>=1.15",
+    "networkx>=3.6",
+    "jaro-winkler>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "pytest-xdist>=3.6",
+    "hypothesis>=6.117",
+    "basedpyright>=1.39.9",
+    "ruff>=0.9",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.12"
+pythonPlatform = "All"
+reportUnusedImport = "error"
+reportExplicitAny = "error"
+reportMissingTypeArgs = "error"
+reportUnknownMemberType = "error"
+reportUnknownParameterType = "error"
+reportUnknownVariableType = "error"
+reportUnknownArgumentType = "error"
+reportUntypedFunctionDecorator = "error"
+reportMissingTypeStubs = "warning"
+reportImplicitOverride = "error"
+reportShadowedImports = "error"
+reportUninitializedInstanceVariable = "none"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "ALL",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+filterwarnings = ["error"]

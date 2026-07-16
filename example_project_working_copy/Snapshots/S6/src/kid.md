@@ -1,1 +1,1 @@
-../../../Content/e1/e1ac2cf5958ca205c0ad6f4b01a0a53fceeba720a51380b6bafdff12ae9a7fe6
+../../../Content/src/kid.md

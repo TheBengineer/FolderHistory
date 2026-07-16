@@ -29,13 +29,6 @@
       "new_hash": "18fcebbd347252386ea5b9b7c51ded13f3ea8870ba3ef0d04a93cb7a5273cf30"
     },
     {
-      "op": "modify",
-      "old_path": "src/kid.md",
-      "new_path": "src/kid.md",
-      "old_hash": "d8aea3854ec96514275d180db48d83d446230d717df4c4a5f14492b9559c42f3",
-      "new_hash": "e1ac2cf5958ca205c0ad6f4b01a0a53fceeba720a51380b6bafdff12ae9a7fe6"
-    },
-    {
       "op": "create",
       "new_path": "mecu.md",
       "new_hash": "9b3ecd07d0af3be1127a5269d666368347ea09a8ab59a258ca8d91fa9fcdb6cd"
@@ -46,7 +39,14 @@
       "new_path": "ked.json",
       "old_hash": "87f3f494563efc0713d41134b69b1b2caf7081208aa4c5fab9739ae2c706e6b6",
       "new_hash": "0e1a54c166b68a21d4cdd4fe7775575464e790289f71bdf686f9542a7eebef35"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/kid.md",
+      "new_path": "src/kid.md",
+      "old_hash": "d8aea3854ec96514275d180db48d83d446230d717df4c4a5f14492b9559c42f3",
+      "new_hash": "e1ac2cf5958ca205c0ad6f4b01a0a53fceeba720a51380b6bafdff12ae9a7fe6"
     }
   ],
-  "human": "Snapshot: S6\nTimestamp: 1784227258.0275915\n\nChanges:\n  ~ docs/rilejifa_v2_copy.json (modified)\n  > src/lek_moved_renamed.md -> src/lek_moved_renamed_v2.md\n  ~ src/lozihi_renamed.txt (modified)\n  > src/nezoqog_renamed_v2.md -> src/nezoqog_renamed_v2_renamed.md\n  ~ src/kid.md (modified)\n  + mecu.md (created)\n  ~ ked.json (modified)\n\n7 operations"
+  "human": "Snapshot: S6\nTimestamp: 1784228146.4609141\n\nChanges:\n  ~ docs/rilejifa_v2_copy.json (modified)\n  > src/lek_moved_renamed.md -> src/lek_moved_renamed_v2.md\n  ~ src/lozihi_renamed.txt (modified)\n  > src/nezoqog_renamed_v2.md -> src/nezoqog_renamed_v2_renamed.md\n  + mecu.md (created)\n  ~ ked.json (modified)\n  ~ src/kid.md (modified)\n\n7 operations"
 }

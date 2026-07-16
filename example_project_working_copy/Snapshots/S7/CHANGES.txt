@@ -13,11 +13,6 @@
       "new_hash": "41436a58f711e173d09fcdb61bf64a5aa6ea3184a6f24dab7f0c9a810dd54024"
     },
     {
-      "op": "create",
-      "new_path": "zisidasu.md",
-      "new_hash": "fe9346c976a95641d01fbafff793b6b9ca7940eba0f8bfe2f350e347ca1dd28f"
-    },
-    {
       "op": "modify",
       "old_path": "data/vayitaf.md",
       "new_path": "data/vayitaf.md",
@@ -25,17 +20,22 @@
       "new_hash": "3c61f34a463f3faad3b3dfed088474b3644456c34a827dd6eccbadac2e6e1eb8"
     },
     {
-      "op": "modify",
-      "old_path": "src/kid.md",
-      "new_path": "src/kid.md",
-      "old_hash": "e1ac2cf5958ca205c0ad6f4b01a0a53fceeba720a51380b6bafdff12ae9a7fe6",
-      "new_hash": "a66235131d1df0d767b24992640842e4a324339dde22e5981dfdccc02c00a8ce"
+      "op": "create",
+      "new_path": "zisidasu.md",
+      "new_hash": "fe9346c976a95641d01fbafff793b6b9ca7940eba0f8bfe2f350e347ca1dd28f"
     },
     {
       "op": "delete",
       "old_path": "mecu.md",
       "old_hash": "9b3ecd07d0af3be1127a5269d666368347ea09a8ab59a258ca8d91fa9fcdb6cd"
+    },
+    {
+      "op": "modify",
+      "old_path": "src/kid.md",
+      "new_path": "src/kid.md",
+      "old_hash": "e1ac2cf5958ca205c0ad6f4b01a0a53fceeba720a51380b6bafdff12ae9a7fe6",
+      "new_hash": "a66235131d1df0d767b24992640842e4a324339dde22e5981dfdccc02c00a8ce"
     }
   ],
-  "human": "Snapshot: S7\nTimestamp: 1784227258.0509903\n\nChanges:\n  - src/lek_moved_renamed_v2.md (deleted)\n  > src/dumupu_renamed.md -> src/dumupu_renamed_v2.md\n  + zisidasu.md (created)\n  ~ data/vayitaf.md (modified)\n  ~ src/kid.md (modified)\n  - mecu.md (deleted)\n\n6 operations"
+  "human": "Snapshot: S7\nTimestamp: 1784228146.4869144\n\nChanges:\n  - src/lek_moved_renamed_v2.md (deleted)\n  > src/dumupu_renamed.md -> src/dumupu_renamed_v2.md\n  ~ data/vayitaf.md (modified)\n  + zisidasu.md (created)\n  - mecu.md (deleted)\n  ~ src/kid.md (modified)\n\n6 operations"
 }

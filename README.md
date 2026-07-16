@@ -14,7 +14,7 @@ FolderHistory produces three different kinds of output from the same analysis:
 | **Working Copy** | `Content/` (latest files) + `Snapshots/dated/` (incremental deltas + CHANGES.txt) | Direct browsing, no git needed, intuitive undo history |
 | **Git Repos** | Real `.git/` repositories with commit history and metadata in `refs/notes/fh/*` | git tooling (`git log`, `git blame`, `git diff`), pushing to remotes |
 
-The **Working Copy** format stores the latest files in `Content/` and only changed files in each dated snapshot, deduplicated by BLAKE3 hash. Snapshots symlink into the Content store — no copies. Deleted files are preserved in `.fh-deleted/`. A `CHANGES.txt` in each snapshot folder provides both machine-parseable and human-readable change logs.
+The **Working Copy** format stores the latest snapshot's full file tree in `Content/` as a clean working copy — real filenames, real directory structure, directly browsable in any editor. Older snapshots only store `CHANGES.txt` plus symlinks into `Content/` for files that changed in that snapshot. Deleted files are preserved in `.fh-deleted/`. A `CHANGES.txt` in each snapshot folder provides both machine-parseable and human-readable change logs.
 
 The **Git Repos** format creates a real git repository from the timeline, with one commit per snapshot, auto-detected renames, and metadata (ctime, permissions, confidence) stored via `git notes` in `refs/notes/fh/*` namespaces. Perfect for when you want the full git workflow on reconstructed history.
 
@@ -147,13 +147,16 @@ Backup snapshots (directories)
 ```
 <output>/
 ├── timeline.json              # Root manifest
-├── Content/                   # BLAKE3-deduplicated file store
-│   └── <prefix>/<hash>        # One file per unique content
+├── Content/                   # Clean working copy of latest snapshot
+│   ├── src/
+│   │   └── main.py            # Real filenames, real paths
+│   ├── README.md
+│   └── ...                    # Directly browsable in any editor
 └── Snapshots/
     ├── latest → <id>/         # Convenience symlink
     ├── S0/
     │   ├── CHANGES.txt        # Machine JSON + human-readable summary
-    │   ├── src/main.py → ../../Content/ab/abc...  # Symlinks into Content/
+    │   ├── src/main.py → ../../Content/src/main.py  # Symlinks into Content/
     │   └── .fh-deleted/       # Deleted file content preserved
     ├── S1/
     │   └── ...

@@ -5,10 +5,13 @@ Matches project roots across snapshots before file-level identity assignment.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 from collections import defaultdict
+from typing import cast
 
+from folderhistory.knowledge import KnowledgeBase
 from folderhistory.types import FileRecord, Snapshot
 
 logger = logging.getLogger(__name__)
@@ -96,6 +99,36 @@ def _get_usable_hash(f: FileRecord) -> str | None:
     """Return the best content hash for *f*, or ``None`` if unavailable."""
     h = f.normalized_blake3 if f.normalized_blake3 is not None else f.raw_blake3
     return h if h else None
+
+
+# ── Fingerprint helpers (KB probe) ─────────────────────────────────────────────
+
+
+_SIMILARITY_KNOWN = 0.7
+_SIMILARITY_TENTATIVE = 0.4
+
+
+def _compute_project_fingerprint(snapshot: Snapshot) -> str:
+    """Return a deterministic fingerprint string for *snapshot*.
+
+    The fingerprint is a SHA-256 hex digest of the sorted list of all
+    usable content hashes in the snapshot.  An empty string is returned
+    when the snapshot has no usable hashes.
+    """
+    hashes = sorted(
+        h for f in snapshot.files if (h := _get_usable_hash(f)) is not None
+    )
+    if not hashes:
+        return ""
+    return hashlib.sha256("".join(hashes).encode()).hexdigest()
+
+
+def _plain_jaccard(a: set[str], b: set[str]) -> float:
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
 
 
 def content_probe_subtree(
@@ -234,6 +267,8 @@ def normalize_paths_to_root(
 def resolve_project_identities(
     snapshots: list[Snapshot],
     global_inverted_index: dict[str, list[tuple[str, str]]],
+    kb: KnowledgeBase | None = None,
+    mode: str = "auto",
 ) -> dict[str, list[str]]:
     """Group snapshot IDs into project identities using IDF-weighted Jaccard.
 
@@ -241,12 +276,37 @@ def resolve_project_identities(
     the same project.  Transitive closure (union-find) is applied so that
     ``A ≈ B`` and ``B ≈ C`` places all three in one group.
 
-    Returns ``{project_uid: [snapshot_id, …], …}`` where the *project_uid* is
-    the ID of the first snapshot in each group (by input order).
+    Parameters
+    ----------
+    kb:
+        Optional :class:`KnowledgeBase` for delta-mode acceleration.  When
+        provided and *mode* is not ``"full"``, each snapshot's content
+        fingerprint is checked against known projects before running the
+        full pairwise comparison.
+    mode:
+        One of ``"auto"``, ``"full"``, or ``"delta"``.
+
+        - ``"auto"`` (default): Snapshots that match a known project
+          (Jaccard :math:`\\ge 0.7`) are assigned directly; the remaining
+          snapshots go through the full pipeline.
+        - ``"full"``: Run the full pipeline on all snapshots, ignoring any
+          KB.  Equivalent to the pre-KB behaviour.
+        - ``"delta"``: Only return groups for snapshots that match known
+          projects.  The full pipeline is skipped entirely.
+
+    Returns
+    -------
+    ``{project_uid: [snapshot_id, …], …}`` where the *project_uid* is
+    the ID of the first snapshot in each group (by input order), or a
+    KB-assigned identifier for delta-matched groups.
     """
     num_snapshots = len(snapshots)
     if num_snapshots == 0:
         return {}
+
+    if mode not in ("auto", "full", "delta"):
+        msg = f"Unknown mode: {mode!r} (expected 'auto', 'full', or 'delta')"
+        raise ValueError(msg)
 
     # ── Global hash frequency ──────────────────────────────────────────────
     global_freq = _hash_frequency(global_inverted_index)
@@ -261,8 +321,51 @@ def resolve_project_identities(
                 hashes.add(h)
         snapshot_hashes[snap.id] = hashes
 
+    # ── KB probe (delta mode support) ──────────────────────────────────────
+    kb_result: dict[str, list[str]] = {}
+    skipped_ids: set[str] = set()
+
+    if kb is not None and mode != "full":
+        for snap in snapshots:
+            fp = _compute_project_fingerprint(snap)
+            if not fp:
+                continue
+
+            stored = kb.get_project(fp)
+            if stored is None:
+                continue
+
+            stored_dict: dict[str, object] = (
+                cast("dict[str, object]", stored) if isinstance(stored, dict) else {}
+            )
+            stored_fp_raw = stored_dict.get("fingerprint", {})
+            if not isinstance(stored_fp_raw, dict):
+                continue
+
+            stored_fp_typed = cast("dict[str, float]", stored_fp_raw)
+            similarity = _plain_jaccard(
+                snapshot_hashes.get(snap.id, set()),
+                set(stored_fp_typed.keys()),
+            )
+
+            if similarity >= _SIMILARITY_KNOWN:
+                kb_result.setdefault(fp, []).append(snap.id)
+                skipped_ids.add(snap.id)
+
+        if mode == "delta":
+            return kb_result
+
+    # ── Full pipeline (for full mode or auto-mode unmatched snapshots) ────
+    if mode == "auto" and kb is not None:
+        remaining = [s for s in snapshots if s.id not in skipped_ids]
+    else:
+        remaining = snapshots
+
+    if not remaining:
+        return kb_result
+
     # ── Union-Find ──────────────────────────────────────────────────────────
-    parent: dict[str, str] = {snap.id: snap.id for snap in snapshots}
+    parent: dict[str, str] = {s.id: s.id for s in remaining}
 
     def find(x: str) -> str:
         # Path compression
@@ -276,29 +379,34 @@ def resolve_project_identities(
         if rx != ry:
             parent[rx] = ry
 
-    # ── Pairwise comparison ─────────────────────────────────────────────────
-    for i in range(num_snapshots):
-        si = snapshots[i]
-        for j in range(i + 1, num_snapshots):
-            sj = snapshots[j]
+    # ── Pairwise comparison (on remaining snapshots) ───────────────────────
+    rlen = len(remaining)
+    for i in range(rlen):
+        si = remaining[i]
+        for j in range(i + 1, rlen):
+            sj = remaining[j]
             jaccard = idf_weighted_jaccard(
                 snapshot_hashes[si.id],
                 snapshot_hashes[sj.id],
                 global_freq,
-                num_snapshots,
+                num_snapshots,  # Use total count for consistent IDF
             )
             if jaccard > 0.5:
                 union(si.id, sj.id)
 
-    # ── Group by component, derive uid from first snapshot ─────────────────
+    # ── Group by component ─────────────────────────────────────────────────
     components: dict[str, list[str]] = {}
-    for snap in snapshots:
-        root = find(snap.id)
-        components.setdefault(root, []).append(snap.id)
+    for s in remaining:
+        root = find(s.id)
+        components.setdefault(root, []).append(s.id)
 
     result: dict[str, list[str]] = {}
     for snap_ids in components.values():
         uid = snap_ids[0]
         result[uid] = snap_ids
+
+    # ── Merge KB results ───────────────────────────────────────────────────
+    for uid, sids in kb_result.items():
+        result[uid] = sids
 
     return result

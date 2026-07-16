@@ -9,6 +9,7 @@ from folderhistory.core.identity import (
     assign_identities_exact,
     assign_identities_with_blocking,
 )
+from folderhistory.knowledge.json_kb import JSONKnowledgeBase
 from folderhistory.types import FileRecord, IdentityCluster, Snapshot
 
 
@@ -467,3 +468,109 @@ class TestIdentityClusterStructure:
             obs = cluster.observations
             for i in range(len(obs) - 1):
                 assert obs[i] <= obs[i + 1]
+
+
+# ── assign_identities_exact with Knowledge Base ───────────────────────────
+
+
+class TestAssignIdentitiesExactWithKB:
+    """Tests for :func:`assign_identities_exact` with KB pre-seeding."""
+
+    def test_kb_none_backward_compatible(self) -> None:
+        """Without KB, behaviour is unchanged (empty input → empty)."""
+        assert assign_identities_exact([], kb=None) == {}
+
+    def test_known_hash_pre_assigned(self, tmp_path: Path) -> None:
+        """Known hashes in KB are pre-assigned to the known cluster UID."""
+        kb_path = tmp_path / "test_kb.json"
+        kb = JSONKnowledgeBase(kb_path, schema_version=1)
+        kb.open()
+        kb.set_identity("hash_abc", "cluster_001", 1.0)
+
+        f = _make_file("a.txt", "hash_abc")
+        snap = _make_snapshot("v1", f)
+        clusters = assign_identities_exact([snap], kb=kb)
+
+        assert len(clusters) == 1
+        assert "cluster_001" in clusters
+        cluster = clusters["cluster_001"]
+        assert ("v1", "a.txt") in cluster.observations
+        assert cluster.canonical_path == "a.txt"
+        assert cluster.confidence == 1.0
+
+    def test_known_hash_renamed(self, tmp_path: Path) -> None:
+        """Known hash at different paths is linked via KB anchor."""
+        kb_path = tmp_path / "test_kb.json"
+        kb = JSONKnowledgeBase(kb_path, schema_version=1)
+        kb.open()
+        kb.set_identity("hash_abc", "cluster_001", 1.0)
+
+        f1 = _make_file("old.txt", "hash_abc")
+        f2 = _make_file("new.txt", "hash_abc")
+        snap_a = _make_snapshot("v1", f1)
+        snap_b = _make_snapshot("v2", f2)
+
+        clusters = assign_identities_exact([snap_a, snap_b], kb=kb)
+
+        assert len(clusters) == 1
+        cluster = clusters["cluster_001"]
+        assert ("v1", "old.txt") in cluster.observations
+        assert ("v2", "new.txt") in cluster.observations
+
+    def test_partial_kb(self, tmp_path: Path) -> None:
+        """Some hashes known, some unknown → correct mixed result."""
+        kb_path = tmp_path / "test_kb.json"
+        kb = JSONKnowledgeBase(kb_path, schema_version=1)
+        kb.open()
+        kb.set_identity("hash_abc", "cluster_001", 1.0)
+
+        f_known = _make_file("known.txt", "hash_abc")
+        f_unknown = _make_file("unknown.txt", "hash_xyz")
+        snap = _make_snapshot("v1", f_known, f_unknown)
+
+        clusters = assign_identities_exact([snap], kb=kb)
+
+        assert len(clusters) == 2
+
+        assert "cluster_001" in clusters
+        assert ("v1", "known.txt") in clusters["cluster_001"].observations
+
+        unknown_clusters = {uid: c for uid, c in clusters.items() if uid != "cluster_001"}
+        assert len(unknown_clusters) == 1
+        unknown_uid, unknown_cluster = next(iter(unknown_clusters.items()))
+        assert unknown_uid != "cluster_001"
+        assert ("v1", "unknown.txt") in unknown_cluster.observations
+
+    def test_kb_no_matches(self, tmp_path: Path) -> None:
+        """KB with no relevant mappings → full matching runs as normal."""
+        kb_path = tmp_path / "test_kb.json"
+        kb = JSONKnowledgeBase(kb_path, schema_version=1)
+        kb.open()
+        kb.set_identity("hash_other", "cluster_001", 1.0)
+
+        f1 = _make_file("a.txt", "hash_abc")
+        f2 = _make_file("b.txt", "hash_def")
+        snap = _make_snapshot("v1", f1, f2)
+
+        clusters = assign_identities_exact([snap], kb=kb)
+
+        assert len(clusters) == 2
+        for c in clusters.values():
+            assert ("v1", "a.txt") in c.observations or ("v1", "b.txt") in c.observations
+
+    def test_known_hash_no_hit_in_current(self, tmp_path: Path) -> None:
+        """KB has entries for hashes not present in current snapshots —
+        those KB anchors never enter the UF, so they don't create phantom
+        clusters."""
+        kb_path = tmp_path / "test_kb.json"
+        kb = JSONKnowledgeBase(kb_path, schema_version=1)
+        kb.open()
+        kb.set_identity("hash_ghost", "cluster_ghost", 1.0)
+
+        f = _make_file("real.txt", "hash_real")
+        snap = _make_snapshot("v1", f)
+
+        clusters = assign_identities_exact([snap], kb=kb)
+        assert len(clusters) == 1
+        uid = next(iter(clusters.keys()))
+        assert uid != "cluster_ghost"

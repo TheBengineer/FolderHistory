@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from folderhistory.knowledge import ReadOnlyKB
 from folderhistory.types import IdentityCluster, Snapshot
 
 # ── Union-Find (Disjoint Set) ─────────────────────────────────────────────────
@@ -87,8 +88,22 @@ def _identity_key(path: str) -> str:
     return f"{_IDENTITY_PROJECT_UID}:{path}"
 
 
+_KB_ANCHOR_PREFIX = "kb:"
+"""Prefix for KB anchor identity keys stored in the Union-Find."""
+
+
+def _kb_anchor_key(cluster_uid: str) -> str:
+    """Build a KB anchor identity key for a known *cluster_uid*.
+
+    These keys are placed into the :class:`DisjointSet` alongside real path-based
+    identity keys to carry forward state from previous runs.
+    """
+    return f"{_KB_ANCHOR_PREFIX}{cluster_uid}"
+
+
 def assign_identities_exact(
     snapshots: list[Snapshot],
+    kb: ReadOnlyKB | None = None,
 ) -> dict[str, IdentityCluster]:
     """Assign global identities using exact content-hash matching.
 
@@ -109,15 +124,25 @@ def assign_identities_exact(
     the same Union-Find element).  Hash-based union adds **cross-path** links
     that handle renames.
 
+    When *kb* is provided, the function probes the knowledge base for known
+    hash → cluster-UID mappings **before** running matching.  Known hashes
+    are pre-seeded into the Union-Find structure linked to their previous
+    cluster UID, enabling cross-run state reuse.  New or changed files (hashes
+    not found in the KB) proceed through normal matching.
+
     Parameters
     ----------
     snapshots:
         Ordered (or unordered) list of snapshots to assign identities to.
+    kb:
+        Optional read-only knowledge base for cross-run state reuse.  When
+        ``None`` (default), behaviour is identical to the previous API.
 
     Returns
     -------
     ``{cluster_uid: IdentityCluster}`` where *cluster_uid* is the Union-Find
-    root of the cluster's identity keys.
+    root of the cluster's identity keys (or the KB cluster UID when a known
+    hash is present).
     """
     if not snapshots:
         return {}
@@ -136,6 +161,16 @@ def assign_identities_exact(
 
             if f.raw_blake3:
                 hash_to_keys.setdefault(f.raw_blake3, set()).add(ikey)
+
+                # KB pre-seed: link known hashes to their previous cluster UID.
+                if kb is not None:
+                    cluster_uid = kb.get_identity(f.raw_blake3)
+                    if cluster_uid:
+                        kb_key = _kb_anchor_key(cluster_uid)
+                        # Register both elements before union (find creates if missing).
+                        _ = ds.find(ikey)
+                        _ = ds.find(kb_key)
+                        ds.union(ikey, kb_key)
 
     # Union identity keys that share the same content hash (rename detection).
     for keys in hash_to_keys.values():
@@ -159,12 +194,12 @@ def assign_identities_exact(
 
     clusters: dict[str, IdentityCluster] = {}
     for root, ikeys in root_to_ikeys.items():
-        if not ikeys:
+        real_ikeys = {ik for ik in ikeys if not ik.startswith(_KB_ANCHOR_PREFIX)}
+        if not real_ikeys:
             continue
 
-        # Collect all observations from all identity keys in this component.
         all_obs: list[tuple[str, str]] = []
-        for ik in ikeys:
+        for ik in real_ikeys:
             all_obs.extend(obs.get(ik, []))
 
         if not all_obs:
@@ -185,8 +220,12 @@ def assign_identities_exact(
         path_counts = Counter(p for _, p in deduped)
         canonical: str | None = path_counts.most_common(1)[0][0] if deduped else None
 
-        clusters[root] = IdentityCluster(
-            uid=root,
+        # Determine cluster UID: prefer KB anchor for cross-run continuity.
+        kb_anchors = [ik for ik in ikeys if ik.startswith(_KB_ANCHOR_PREFIX)]
+        uid: str = kb_anchors[0][len(_KB_ANCHOR_PREFIX):] if kb_anchors else root
+
+        clusters[uid] = IdentityCluster(
+            uid=uid,
             observations=deduped,
             canonical_path=canonical,
             confidence=1.0,
@@ -197,6 +236,7 @@ def assign_identities_exact(
 
 def assign_identities_with_blocking(
     snapshots: list[Snapshot],
+    kb: ReadOnlyKB | None = None,
 ) -> dict[str, IdentityCluster]:
     """Size-blocked variant of :func:`assign_identities_exact`.
 
@@ -215,10 +255,16 @@ def assign_identities_with_blocking(
     Path-based identity (same path across snapshots) is handled **before**
     blocking and always applies regardless of size.
 
+    When *kb* is provided, known hashes are pre-seeded into the Union-Find
+    structure linked to their previous cluster UID, exactly as in
+    :func:`assign_identities_exact`.
+
     Parameters
     ----------
     snapshots:
         List of snapshots to assign identities to.
+    kb:
+        Optional read-only knowledge base for cross-run state reuse.
 
     Returns
     -------
@@ -243,6 +289,15 @@ def assign_identities_with_blocking(
             all_ikeys.add(ikey)
             obs.setdefault(ikey, []).append((snap.id, f.path))
 
+            # KB pre-seed: link known hashes to their previous cluster UID.
+            if kb is not None and f.raw_blake3:
+                cluster_uid = kb.get_identity(f.raw_blake3)
+                if cluster_uid:
+                    kb_key = _kb_anchor_key(cluster_uid)
+                    _ = ds.find(ikey)
+                    _ = ds.find(kb_key)
+                    ds.union(ikey, kb_key)
+
             if f.raw_blake3 and f.xxhash64:
                 block_key = (f.size, f.xxhash64)
                 blocks.setdefault(block_key, {}).setdefault(
@@ -266,11 +321,12 @@ def assign_identities_with_blocking(
 
     clusters: dict[str, IdentityCluster] = {}
     for root, ikeys in root_to_ikeys.items():
-        if not ikeys:
+        real_ikeys = {ik for ik in ikeys if not ik.startswith(_KB_ANCHOR_PREFIX)}
+        if not real_ikeys:
             continue
 
         all_obs: list[tuple[str, str]] = []
-        for ik in ikeys:
+        for ik in real_ikeys:
             all_obs.extend(obs.get(ik, []))
 
         if not all_obs:
@@ -288,8 +344,12 @@ def assign_identities_with_blocking(
         path_counts = Counter(p for _, p in deduped)
         canonical = path_counts.most_common(1)[0][0] if deduped else None
 
-        clusters[root] = IdentityCluster(
-            uid=root,
+        # Prefer KB anchor UID for cross-run continuity.
+        kb_anchors = [ik for ik in ikeys if ik.startswith(_KB_ANCHOR_PREFIX)]
+        uid: str = kb_anchors[0][len(_KB_ANCHOR_PREFIX):] if kb_anchors else root
+
+        clusters[uid] = IdentityCluster(
+            uid=uid,
             observations=deduped,
             canonical_path=canonical,
             confidence=1.0,

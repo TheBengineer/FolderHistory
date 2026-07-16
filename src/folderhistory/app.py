@@ -1,0 +1,271 @@
+"""Typer CLI for FolderHistory.
+
+Provides ``analyze``, ``diff``, and ``log`` commands for reconstructing
+and inspecting folder history from a collection of snapshots.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import cast
+
+import typer
+
+from folderhistory.core.diff import derive_operations
+from folderhistory.core.identity import assign_identities_exact
+from folderhistory.core.ingest import ingest_manifest, ingest_snapshot
+from folderhistory.core.timeline import Timeline, TimelineNode, build_timeline
+from folderhistory.io.output import format_gitlog, format_json, format_jsonlines
+from folderhistory.types import EditOperation, Snapshot
+
+
+app = typer.Typer(
+    name="folderhistory",
+    help="Reconstruct git-like version history from folder backups.",
+)
+
+
+# ── analyze ────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def analyze(
+    snapshots_dir: Path = typer.Argument(  # type: ignore  [reportCallInDefaultInitializer]
+        ...,
+        help="Directory containing snapshot folders",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+    ),
+    output: Path = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        "timeline.json",
+        "--out",
+        "-o",
+        help="Output file path",
+    ),
+    output_format: str = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        "json",
+        "--format",
+        "-f",
+        help="Output format: json, gitlog, jsonlines",
+    ),
+) -> None:
+    snapshots_dir_resolved = snapshots_dir.resolve()
+    snapshot_dirs = sorted(
+        [d for d in snapshots_dir_resolved.iterdir() if d.is_dir()],
+    )
+    if not snapshot_dirs:
+        _ = typer.echo(
+            f"No snapshot directories found in {snapshots_dir_resolved}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    snapshots = [ingest_snapshot(d) for d in snapshot_dirs]
+    identities = assign_identities_exact(snapshots)
+    operations = derive_operations(snapshots, identities)
+    timeline = build_timeline(snapshots, operations)
+    output_text = _format_timeline(timeline, output_format)
+    _ = output.write_text(output_text)
+    _ = typer.echo(f"Timeline written to {output}")
+
+
+# ── diff ───────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def diff(
+    before: Path = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        ...,
+        "--before",
+        "-b",
+        help="Before snapshot (directory or manifest.json)",
+        exists=True,
+        readable=True,
+    ),
+    after: Path = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        ...,
+        "--after",
+        "-a",
+        help="After snapshot (directory or manifest.json)",
+        exists=True,
+        readable=True,
+    ),
+    output_format: str = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        "json",
+        "--format",
+        "-f",
+        help="Output format: json, gitlog, jsonlines",
+    ),
+) -> None:
+    snap_before = _load_snapshot(before)
+    snap_after = _load_snapshot(after)
+    identities = assign_identities_exact([snap_before, snap_after])
+    ops_list = derive_operations([snap_before, snap_after], identities)
+    pair_ops = ops_list[0] if ops_list else []
+
+    if pair_ops:
+        timeline = build_timeline([snap_before, snap_after], [pair_ops])
+    else:
+        timeline = build_timeline([snap_before, snap_after], [[]])
+
+    output_text = _format_timeline(timeline, output_format)
+    _ = typer.echo(output_text)
+
+
+# ── log ────────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def log(
+    manifest: Path = typer.Argument(  # type: ignore  [reportCallInDefaultInitializer]
+        ...,
+        help="Path to timeline JSON file (output of 'analyze')",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+) -> None:
+    import orjson
+
+    raw = cast("dict[str, object]", orjson.loads(manifest.read_bytes()))
+    timeline = _parse_timeline_json(raw)
+    _ = typer.echo(format_gitlog(timeline))
+
+
+def main() -> None:
+    app()
+
+
+# ── Internal helpers ───────────────────────────────────────────────────────────
+
+
+def _format_timeline(timeline: Timeline, fmt: str) -> str:
+    if fmt == "gitlog":
+        return format_gitlog(timeline)
+    if fmt == "jsonlines":
+        return format_jsonlines(timeline)
+    return format_json(timeline)
+
+
+def _load_snapshot(path: Path) -> Snapshot:
+    if path.is_dir():
+        return ingest_snapshot(path)
+    return ingest_manifest(path)
+
+
+# ── JSON deserialisation (log command) ──────────────────────────────────────────
+
+
+def _parse_timeline_json(raw: dict[str, object]) -> Timeline:
+    import typing
+
+    root_changes_raw: list[dict[str, str]] = []
+    rc_raw: list[object] = typing.cast("list[object]", raw.get("root_changes", []))
+    for item in rc_raw:
+        d: dict[str, object] = typing.cast("dict[str, object]", item)
+        root_changes_raw.append(
+            {
+                "snapshot_id": str(d.get("snapshot_id", "")),
+                "from_root": str(d.get("from_root", "")),
+                "to_root": str(d.get("to_root", "")),
+            }
+        )
+
+    nodes: list[TimelineNode] = []
+    ns_raw: list[object] = typing.cast("list[object]", raw.get("nodes", []))
+    for item in ns_raw:
+        n: dict[str, object] = typing.cast("dict[str, object]", item)
+        node = _parse_node_dict(n)
+        if node is not None:
+            nodes.append(node)
+
+    return Timeline(nodes=nodes, root_changes=root_changes_raw)
+
+
+def _parse_node_dict(d: dict[str, object]) -> TimelineNode | None:
+    import typing
+
+    ops_list: list[EditOperation] = []
+    ops_raw: list[object] = typing.cast(
+        "list[object]",
+        d.get("operations", []),
+    )
+    for item in ops_raw:
+        op_dict: dict[str, object] = typing.cast("dict[str, object]", item)
+        op = _parse_op_dict(op_dict)
+        if op is not None:
+            ops_list.append(op)
+
+    raw_ts = d.get("timestamp")
+    timestamp_val: float | None = None
+    if raw_ts is not None:
+        timestamp_val = float(typing.cast("float | int", raw_ts))
+
+    raw_pid = d.get("parent_id")
+    parent_id_val: str | None = str(raw_pid) if raw_pid is not None else None
+
+    raw_rc = d.get("root_change")
+    root_change_val: str | None = str(raw_rc) if raw_rc is not None else None
+
+    raw_sid = d.get("snapshot_id")
+    snapshot_id_val = str(raw_sid) if raw_sid is not None else ""
+
+    raw_sp = d.get("source_path")
+    source_path_val = str(raw_sp) if raw_sp is not None else ""
+
+    return TimelineNode(
+        snapshot_id=snapshot_id_val,
+        timestamp=timestamp_val,
+        source_path=source_path_val,
+        operations=ops_list,
+        parent_id=parent_id_val,
+        root_change=root_change_val,
+    )
+
+
+def _parse_op_dict(d: dict[str, object]) -> EditOperation | None:
+    import typing
+    from typing import Literal
+
+    raw_optype = d.get("op_type")
+    op_type_str = str(raw_optype) if raw_optype is not None else "modify"
+
+    raw_sp = d.get("source_path")
+    source_path_val: str | None = str(raw_sp) if raw_sp is not None else None
+
+    raw_tp = d.get("target_path")
+    target_path_val: str | None = str(raw_tp) if raw_tp is not None else None
+
+    raw_oh = d.get("old_hash")
+    old_hash_val: str | None = str(raw_oh) if raw_oh is not None else None
+
+    raw_nh = d.get("new_hash")
+    new_hash_val: str | None = str(raw_nh) if raw_nh is not None else None
+
+    raw_conf = d.get("confidence")
+    confidence_val: float = 1.0
+    if raw_conf is not None:
+        confidence_val = float(typing.cast("float | int", raw_conf))
+
+    raw_fid = d.get("file_id")
+    file_id_val = str(raw_fid) if raw_fid is not None else ""
+
+    return EditOperation(
+        op_type=typing.cast(
+            Literal["create", "delete", "modify", "rename", "move", "copy"],
+            op_type_str,
+        ),
+        file_id=file_id_val,
+        source_path=source_path_val,
+        target_path=target_path_val,
+        old_hash=old_hash_val,
+        new_hash=new_hash_val,
+        confidence=confidence_val,
+    )
+
+
+if __name__ == "__main__":
+    main()

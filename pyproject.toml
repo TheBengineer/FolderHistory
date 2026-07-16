@@ -42,6 +42,7 @@ reportMissingTypeStubs = "warning"
 reportImplicitOverride = "error"
 reportShadowedImports = "error"
 reportUninitializedInstanceVariable = "none"
+reportCallInDefaultInitializer = "none"
 
 [tool.ruff]
 target-version = "py312"

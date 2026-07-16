@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from folderhistory.core.dir_align import (
     normalize_paths_to_root,
     resolve_project_identities,
 )
+from folderhistory.knowledge.json_kb import JSONKnowledgeBase
 from folderhistory.types import FileRecord, Snapshot
 
 
@@ -492,3 +494,146 @@ class TestResolveProjectIdentities:
         idx = build_inverted_index([s])
         groups = resolve_project_identities([s], idx)
         assert groups == {"solo": ["solo"]}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  resolve_project_identities (KB probe / delta mode)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestResolveProjectIdentitiesWithKB:
+    """KnowledgeBase-accelerated project identity resolution."""
+
+    # ── test helpers ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _fp_from_hashes(*hashes: str) -> str:
+        """Deterministic fingerprint key for the given content hashes."""
+        return hashlib.sha256("".join(sorted(hashes)).encode()).hexdigest()
+
+    @staticmethod
+    def _populated_kb(path: Path) -> JSONKnowledgeBase:
+        """Return a KB pre-seeded with a known project fingerprint."""
+        kb = JSONKnowledgeBase(path)
+        kb.open()
+        fp = TestResolveProjectIdentitiesWithKB._fp_from_hashes("h1", "h2", "h3", "h4")
+        kb.set_project(fp, {"h1": 1.0, "h2": 1.0, "h3": 1.0, "h4": 1.0})
+        return kb
+
+    # ── known project → delta mode ────────────────────────────────────────────
+
+    def test_known_project_delta_mode(self, tmp_path: Path) -> None:
+        """Auto mode with known project fingerprint → KB uid reused, no full pipeline."""
+        kb = self._populated_kb(tmp_path / "kb.json")
+        try:
+            s1 = _snap(
+                "s1",
+                [
+                    _file("a.py", raw_b3="h1", norm_b3="h1"),
+                    _file("b.py", raw_b3="h2", norm_b3="h2"),
+                    _file("c.py", raw_b3="h3", norm_b3="h3"),
+                    _file("d.py", raw_b3="h4", norm_b3="h4"),
+                ],
+            )
+            s2 = _snap(
+                "s2",
+                [
+                    _file("a.py", raw_b3="h1", norm_b3="h1"),
+                    _file("b.py", raw_b3="h2", norm_b3="h2"),
+                    _file("c.py", raw_b3="h3", norm_b3="h3"),
+                    _file("d.py", raw_b3="h4", norm_b3="h4"),
+                ],
+            )
+            idx = build_inverted_index([s1, s2])
+
+            groups = resolve_project_identities([s1, s2], idx, kb=kb, mode="auto")
+
+            fp = self._fp_from_hashes("h1", "h2", "h3", "h4")
+            assert fp in groups
+            assert sorted(groups[fp]) == ["s1", "s2"]
+            assert len(groups) == 1
+        finally:
+            kb.close()
+
+    # ── tentative match → normal pipeline ──────────────────────────────────────
+
+    def test_tentative_match_normal_pipeline(self, tmp_path: Path) -> None:
+        """Tentative KB match (Jaccard ~0.5) → snapshot goes through full pipeline."""
+        kb = self._populated_kb(tmp_path / "kb.json")
+        try:
+            snap = _snap(
+                "tent",
+                [
+                    _file("a.py", raw_b3="h1", norm_b3="h1"),
+                    _file("b.py", raw_b3="h2", norm_b3="h2"),
+                    _file("c.py", raw_b3="h3", norm_b3="h3"),
+                    _file("e.py", raw_b3="h5", norm_b3="h5"),
+                    _file("f.py", raw_b3="h6", norm_b3="h6"),
+                ],
+            )
+            idx = build_inverted_index([snap])
+
+            groups = resolve_project_identities([snap], idx, kb=kb, mode="auto")
+
+            fp = self._fp_from_hashes("h1", "h2", "h3", "h4")
+            assert fp not in groups
+            assert "tent" in groups
+            assert groups["tent"] == ["tent"]
+        finally:
+            kb.close()
+
+    # ── no match → full pipeline ──────────────────────────────────────────────
+
+    def test_no_match_full_pipeline(self, tmp_path: Path) -> None:
+        """No KB match → full pipeline runs normally."""
+        kb = self._populated_kb(tmp_path / "kb.json")
+        try:
+            snap = _snap("new", [_file("x.py", raw_b3="x99", norm_b3="x99")])
+            idx = build_inverted_index([snap])
+
+            groups = resolve_project_identities([snap], idx, kb=kb, mode="auto")
+
+            assert "new" in groups
+            assert groups["new"] == ["new"]
+        finally:
+            kb.close()
+
+    # ── mode='full' bypasses KB ────────────────────────────────────────────────
+
+    def test_mode_full_bypasses_kb(self, tmp_path: Path) -> None:
+        """mode='full' ignores the KB even when a match exists."""
+        kb = self._populated_kb(tmp_path / "kb.json")
+        try:
+            s = _snap("s1", [_file("a.py", raw_b3="h1", norm_b3="h1")])
+            idx = build_inverted_index([s])
+
+            groups = resolve_project_identities([s], idx, kb=kb, mode="full")
+
+            assert "s1" in groups
+            assert groups["s1"] == ["s1"]
+        finally:
+            kb.close()
+
+    # ── no KB → backward compatible ────────────────────────────────────────────
+
+    def test_no_kb_backward_compatible(self) -> None:
+        """kb=None (default) → runs full pipeline as before."""
+        s = _snap("s1", [_file("a.py", raw_b3="h1", norm_b3="h1")])
+        groups = resolve_project_identities([s], {})
+        assert groups == {"s1": ["s1"]}
+
+    # ── empty KB → full pipeline ───────────────────────────────────────────────
+
+    def test_empty_kb_first_run(self, tmp_path: Path) -> None:
+        """Empty KB (first run) → no stored projects → full pipeline."""
+        kb = JSONKnowledgeBase(tmp_path / "kb.json")
+        kb.open()
+        try:
+            s = _snap("s1", [_file("a.py", raw_b3="h1", norm_b3="h1")])
+            idx = build_inverted_index([s])
+
+            groups = resolve_project_identities([s], idx, kb=kb, mode="auto")
+
+            assert groups == {"s1": ["s1"]}
+        finally:
+            kb.close()

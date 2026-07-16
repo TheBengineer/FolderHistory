@@ -2,172 +2,249 @@
 
 **Reconstruct git-like version history from messy folder backups — using only file metadata.**
 
-When you have a pile of backup snapshots of a directory — taken at different times, possibly overlapping, with timestamps that may be unreliable — FolderHistory aims to reconstruct the most likely sequence of changes: which files were created, modified, moved, renamed, or deleted, and in what order.
+When you have a pile of backup snapshots of a directory — taken at different times, possibly overlapping, with timestamps that may be unreliable — FolderHistory reconstructs the most likely sequence of changes: which files were created, modified, moved, renamed, or deleted, and in what order.
+
+## Quick Start
+
+```bash
+# Install
+pip install folderhistory
+
+# Point at a directory of backup snapshots
+folderhistory analyze ~/backups/ --out history.json
+
+# View as git-style log
+folderhistory log history.json
+
+# Export as browsable working copy
+python -m folderhistory.app analyze ~/backups/ --format working-copy --out ./project
+
+# Or export as real git repo
+python -m folderhistory.app analyze ~/backups/ --out timeline.json
+# (then use the git export module programmatically)
+```
 
 ## The Problem
 
-You back up a project folder manually, or via cron, or with a cloud sync tool. Over months or years you accumulate N near-identical copies of the same directory tree. Each snapshot has:
+You back up a project folder manually, via cron, or with a cloud sync tool. Over months or years you accumulate N near-identical copies of the same directory. Each snapshot has a directory tree with file metadata — but that metadata is flawed:
 
-- A **directory tree** (files & folders at that point in time)
-- **File metadata**: creation time, modification time, size, permissions
-- Possibly **content hashes** (if you opt in)
+- **ctime** resets when copied between filesystems
+- **mtime** may be preserved or stripped depending on the tool
+- **Filenames** change when files are renamed or moved
+- **Content** drifts as files are edited across devices
+- **Snapshots** may be incomplete if backups were interrupted
 
-But metadata is **flawed**:
+FolderHistory solves this by treating it as a **global file-identity assignment problem**: figure out which files across different snapshots represent the same logical entity, despite name changes, moves, and metadata corruption.
 
-- `ctime` (creation time) may be reset when files are copied between filesystems
-- `mtime` (modification time) may be preserved or stripped depending on the backup tool
-- Files may be renamed, moved, or duplicated across snapshots with no trace
-- Snapshot timestamps themselves may be imprecise or lost
-
-The challenge: given only these noisy snapshots, reconstruct the most plausible **linear or branching history** of how the folder evolved over time.
-
-## Project Phases
-
-### Phase 1 — Deterministic Reconstruction (known ground truth)
-
-Build an algorithm that works when metadata is **reliable**. Given ordered snapshots with accurate timestamps, reconstruct a precise sequence of file-system operations (create, modify, delete, rename, move) between each pair of consecutive snapshots. This serves as the ground-truth baseline.
-
-### Phase 2 — Probabilistic Reconstruction (flawed metadata)
-
-Extend the algorithm to handle **uncertainty**:
-
-- Unknown snapshot ordering → infer temporal order
-- Inconsistent timestamps → weight evidence probabilistically
-- Missing data → interpolate between known states
-- Rename/move detection → use content similarity when metadata is ambiguous
-
-Output a ranked set of possible histories with confidence scores, rather than a single deterministic answer.
-
-## Algorithmic Approaches
-
-This project synthesises ideas from several research areas. Here are the major families under consideration:
-
-### 1. Tree Edit Distance (TED)
-
-Classic approach: model each snapshot as a **rooted, labelled tree** and compute the minimum-cost edit script that transforms one tree into another. Operations: insert node, delete node, rename node.
-
-- **Strengths**: Well-studied, provable optimality for ordered trees (Zhang-Shasha, O(n³)).
-- **Weaknesses**: Unordered trees are MAX-SNP hard; rename detection requires subtree similarity, not just identity; doesn't natively handle moves or copies.
-- **References**: Zhang & Shasha (1989), "Simple Fast Algorithms for the Editing Distance Between Trees and Related Problems."
-
-### 2. MH-DIFF — Meaningful Change Detection (Edge Cover model)
-
-Represents nodes as a **bipartite graph** and finds a minimum-cost edge cover to match nodes between two tree snapshots. Supports **move and copy** operations — not just insert/delete/update. The edge cover is then decoded into an edit script.
-
-- **Strengths**: Detects moved/copied subtrees (semantically meaningful); produces compact edit scripts.
-- **Weaknesses**: Heuristic; doesn't guarantee optimal edit distance.
-- **References**: Chawathe et al. (1996), "Change Detection in Hierarchically Structured Information" (SIGMOD).
-
-### 3. RWS-Diff — Random Walk Similarity Diff
-
-Represents each subtree as a **d-dimensional feature vector** via random walks, then uses nearest-neighbour search to find similar (not identical) subtrees across snapshots. Runs in O(n log n).
-
-- **Strengths**: Handles both ordered and unordered trees; similarity-aware (matches near-identical subtrees even when labels differ); O(n log n) scalable.
-- **Weaknesses**: Probabilistic approximation; may miss exact minimal edit scripts.
-- **References**: Finis et al. (2013), "RWS-Diff: Flexible and Efficient Change Detection in Hierarchical Data."
-
-### 4. Multi-Signal Provenance Reconstruction (VU Amsterdam)
-
-Treats history reconstruction as a **multi-signal fusion pipeline**: extract signals from content similarity, metadata similarity, temporal ordering, and domain-specific heuristics; generate candidate provenance graphs; prune inconsistent hypotheses; aggregate and rank.
-
-- **Strengths**: Combines multiple weak signals for robustness; extensible to new signals; handles mixed data types.
-- **Weaknesses**: Requires tuning signal weights; computationally expensive for large snapshot sets.
-- **References**: Niels de Vries (2012), "Reconstructing Provenance of Files from Filesystem Metadata" (VU Amsterdam).
-
-### 5. Backwards Timestamp Reasoning (NTFS)
-
-Rather than comparing snapshots forward, **work backwards** from final timestamps. Given a file's current NTFS timestamps and a known set of possible filesystem operations, constrain which sequences of operations could have produced that state. Build a tree of possible timelines.
-
-- **Strengths**: Can reconstruct history from a single snapshot; accounts for timestamp-altering operations.
-- **Weaknesses**: Limited to NTFS timestamp semantics; combinatorial explosion of possible histories.
-- **References**: Bouma et al. (2023), "Reconstructing Timelines: From NTFS Timestamps to File Histories."
-
-### 6. Document-Level Revision Detection
-
-Models document revision detection as a **minimum-cost branching problem** on a directed graph of documents, using semantic distances. Proposes wDTW (word vector-based Dynamic Time Warping) and wTED (word vector-based Tree Edit Distance) for document-level comparison.
-
-- **Strengths**: Unsupervised; handles large corpora; semantic understanding.
-- **Weaknesses**: Document-focused, not folder-tree focused; requires vector embeddings.
-- **References**: Zhu, Klabjan, Bless (2017), "Semantic Document Distance Measures and Unsupervised Document Revision Detection."
-
-## Architecture (Proposed)
+## Pipeline
 
 ```
-Snapshots (N folders)
-       │
-       ▼
-┌──────────────────────┐
-│  Snapshot Ingestion   │  Parse directory tree, extract metadata,
-│                       │  optionally hash file contents
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Pairwise Comparison  │  Compare every pair of snapshots using
-│                       │  one or more matching strategies
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Graph Construction   │  Build a weighted DAG where nodes are
-│                       │  snapshot states, edges are edit scripts
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Path Optimisation    │  Find most likely global history path(s)
-│                       │  through the snapshot graph
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  History Output       │  Render as git-like log, timeline,
-│                       │  or structured diff stream
-└──────────────────────┘
+Backup snapshots (directories)
+        │
+        ▼
+┌──────────────────┐
+│    Ingestion      │  Walk directories, compute BLAKE3 hashes (raw + normalized),
+│                   │  detect line endings, normalize paths (NFC)
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Dir Alignment   │  Inverted hash index → IDF-weighted Jaccard → find project
+│                   │  roots across differently-located snapshots
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Identity        │  Union-Find over (project_uid, relative_path) keys.
+│  Assignment      │  Content hash + path matching. Optional KB pre-seed.
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Diff            │  Derive operations: create, delete, modify, rename,
+│                   │  move, copy — with confidence scores
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Consistency     │  Transitive closure check, cross-location validation,
+│  Check           │  inner loop refinement (max 2 iterations)
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Timeline        │  Linear or branching DAG with root-change annotations
+│  Output          │  → JSON / gitlog / Working Copy / git repos
+└──────────────────┘
 ```
 
-### Key Design Decisions (to be resolved)
+## Features
 
-| Decision | Options | Notes |
-|----------|---------|-------|
-| Pairwise matching algorithm | TED / MH-DIFF / RWS-Diff / content hash | Phase 1: simple hash + path matching. Phase 2: similarity-based. |
-| History model | Linear chain / DAG / branching tree | Phase 1: assume linear (if snapshot order known). Phase 2: allow branching. |
-| Rename detection | Path-based / hash-based / similarity-based | Path change + content match = rename hypothesis. |
-| Timestamp confidence model | None / weight by filesystem / Bayesian | Phase 2 only. |
-| Output format | Git-like log / JSON diff stream / Graphviz DOT | User-facing vs machine-readable. |
+### Ingestion
+- **Raw + normalized BLAKE3 hashing**: Detects identical files despite CRLF/LF differences
+- **Line-ending detection**: Classifies files as LF/CRLF/mixed/binary
+- **NFC path normalization**: Cross-platform path matching
+- **Streaming hashing**: Handles files >50MB without loading into memory
+- **Symlink tracking**: Records symlinks without following them
+- **Permission errors**: Gracefully skips unreadable files
 
-## Development Roadmap
+### Identity Assignment
+- **Exact matching**: Content hash + path via Union-Find
+- **Multi-signal fusion**: Content, path (Jaro-Winkler), and metadata similarity
+- **Size-blocked variant**: Blocks by size → xxhash64 → BLAKE3 for efficiency
+- **Cross-location detection**: Finds project subtrees across different root directories
 
-### Milestone 1 — Snapshot diff engine
-- [ ] Implement pairwise snapshot comparison (path + hash matching)
-- [ ] Detect: created files, deleted files, modified files, moved/renamed files
-- [ ] Output structured diffs (create/delete/modify/rename operations)
+### Operation Derivation
+- 6 operation types: `create`, `delete`, `modify`, `rename`, `move`, `copy`
+- Rename vs. move classification (basename change vs. parent directory change)
+- Normalized-hash fallback for cross-platform content identity
+- Full confidence tracking per operation
 
-### Milestone 2 — Linear history reconstruction
-- [ ] Accept ordered snapshot sequence
-- [ ] Chain pairwise diffs into a linear timeline
-- [ ] Render as git-style log
+### Timeline Output
+- **Linear timeline**: Ordered snapshot chain with parent/child links
+- **Branching DAG**: Fork/merge support for non-linear histories
+- **Root-change annotations**: Detects when project location changed
+- **Git export**: Real git repos with commit history + metadata notes
+- **Working Copy export**: Browsable directory trees with incremental snapshot storage
 
-### Milestone 3 — Unordered / probabilistic reconstruction
-- [ ] Infer snapshot ordering from timestamps and content
-- [ ] Add similarity-based matching (RWS-Diff or multi-signal)
-- [ ] Score and rank alternative histories
-- [ ] Handle missing snapshots (interpolation)
+### Knowledge Base & Feedback Loop
+- **Cross-run state persistence**: Identities and fingerprints cached between runs
+- **JSON Knowledge Base**: Zero-dependency KV store in `.folderhistory/`
+- **Contradiction resolution**: 4 strategies (merge/rename, split, confidence-weight, evidence-weight)
+- **IGS metric**: Identity Graph Stability tracking
+- **Inner loop**: Up to 2 iterations of consistency threshold relaxation
 
-### Milestone 4 — Robustness & real-world testing
-- [ ] Test with deliberately corrupted / shifted timestamps
-- [ ] Test with cross-filesystem copies (ctime reset)
-- [ ] Fuzz test against random directory mutations
-- [ ] Benchmark on large directory trees
+### Cross-Location Project Detection
+- **Content-probe subtree location**: Finds project roots inside larger snapshots
+- **IDF-weighted Jaccard**: Correctly discounts shared dependencies (node_modules, etc.)
+- **Root-relative path normalization**: Identity keys survive location changes
 
-## Related Work & Further Reading
+## Output Formats
 
-- **Git internals** — `git diff-tree`, rename detection (`-M`, `-C`), similarity index heuristics
-- **fs-tree-diff** (Stefan Penner) — minimal patch calculation between two filesystem trees
-- **btrfs-file-history** (fkzys) — track file lifecycle across btrfs snapshots using UUID linkage
-- **foldiff** (yellowsink) — efficient binary folder diffing for backup storage
-- **VU provenance reconstruction** — multi-signal pipeline for reconstructing file dependencies in shared folders
-- **Btr-Diff** (Pimpale et al., 2014) — kernel-level Btrfs snapshot diff using COW B-tree structures
+| Format | Command | Description |
+|--------|---------|-------------|
+| JSON | `--format json` | Machine-readable timeline with operations and root changes |
+| Git log | `--format gitlog` | Human-readable commit-style history |
+| Working Copy | `--format working-copy` | `Content/` + `Snapshots/dated/` directory tree |
+| Git repos | (via `git_export.py`) | Real git repositories with metadata via `refs/notes/fh/*` |
+
+### Working Copy Format
+
+```
+<output>/
+├── timeline.json              # Root manifest
+├── Content/                   # BLAKE3-deduplicated file store
+│   └── <prefix>/<hash>        # One file per unique content
+└── Snapshots/
+    ├── latest → <id>/         # Convenience symlink
+    ├── S0/
+    │   ├── CHANGES.txt        # Machine JSON + human-readable summary
+    │   ├── src/main.py → ../../Content/ab/abc...  # Symlinks into Content/
+    │   └── .fh-deleted/       # Deleted file content preserved
+    ├── S1/
+    │   └── ...
+    └── ...
+```
+
+### Git Export (programmatic)
+
+```python
+from folderhistory.io.git_export import export_git
+export_git(timeline, snapshots, Path("./my-repo"))
+```
+
+Produces a real git repository with:
+- One commit per snapshot
+- Metadata preserved via `refs/notes/fh/metadata`
+- Confidence scores via `refs/notes/fh/confidence`
+- Full git tooling support: `git log`, `git diff`, `git blame`
+
+## CLI Reference
+
+```bash
+# Analyze snapshots and produce timeline
+folderhistory analyze <SNAPSHOTS_DIR>
+  --out PATH                  Output path (default: timeline.json)
+  --format json|gitlog|jsonlines|working-copy
+  --mode full|delta|auto     Processing mode (default: auto)
+  --apply corrections.json   User-provided identity corrections
+  --kb-rollback N            Restore KB version N
+
+# Compare two snapshots directly
+folderhistory diff --before <DIR> --after <DIR>
+  --format json|gitlog|jsonlines
+
+# View timeline as git log
+folderhistory log <timeline.json>
+
+# Inspect cross-run cache
+folderhistory kb-status
+```
+
+## Project Structure
+
+```
+src/folderhistory/
+├── app.py                   # Typer CLI
+├── types.py                 # Core dataclasses (Snapshot, FileRecord, EditOperation)
+├── models.py                # Project-level types (ProjectRecord, ProjectMatch)
+├── core/
+│   ├── ingest.py            # Snapshot ingestion (walk dirs, compute hashes)
+│   ├── hash.py              # BLAKE3 + xxhash64 (streaming + normalized)
+│   ├── dir_align.py         # Cross-location project detection
+│   ├── identity.py          # Union-Find identity assignment
+│   ├── match.py             # Pairwise snapshot comparison
+│   ├── diff.py              # Operation derivation (6 types)
+│   ├── consistency.py       # Timeline consistency checking
+│   └── timeline.py          # Linear + branching DAG timeline
+├── signals/
+│   ├── content.py           # Content similarity signals
+│   ├── path.py              # Path similarity (Jaro-Winkler)
+│   ├── metadata.py          # Metadata similarity signals
+│   └── fusion.py            # Multi-signal fusion
+├── io/
+│   ├── output.py            # JSON/gitlog/jsonlines formatters
+│   ├── working_copy.py      # Working Copy export
+│   └── git_export.py        # Git repo export
+├── knowledge/
+│   ├── types.py             # KB types (ObservationRecord, ContradictionRecord)
+│   ├── json_kb.py           # JSON Knowledge Base implementation
+│   └── update.py            # KB update rules, contradiction resolution
+├── feedback/
+│   ├── analyzer.py          # Post-run quality analysis
+│   └── refine.py            # Refinement loop stub (Phase 2)
+└── tests/                   # 399+ tests
+```
+
+## Requirements
+
+- **Python 3.12+**
+- No external databases, services, or daemons
+- Git optional (for git export format)
+
+### Runtime dependencies
+`blake3`, `xxhash`, `typer`, `orjson`, `scipy`, `networkx`, `jaro-winkler`
+
+## Development
+
+```bash
+# Setup
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+
+# Type check
+.venv/bin/python -m basedpyright src/
+
+# Test
+.venv/bin/python -m pytest tests/ -v
+
+# Generate dummy test data
+python tests/fixtures/gen_dummy_data.py --scenario ordered-evolution --snapshots 5 --seed 42 --output /tmp/demo
+
+# Run full pipeline on generated data
+python -m folderhistory.app analyze /tmp/demo --out /tmp/demo/timeline.json
+python -m folderhistory.app log /tmp/demo/timeline.json
+```
 
 ## License
 

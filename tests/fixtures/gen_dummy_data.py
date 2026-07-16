@@ -278,6 +278,18 @@ def _build_identity_clusters(state: _GeneratorState) -> list[dict[str, object]]:
     return clusters
 
 
+def _find_source_content(
+    files_i: dict[str, list[_TrackedFile]],
+    content: bytes,
+) -> str | None:
+    """Find the source path in S_i whose content matches. Returns path or None."""
+    for tf_list in files_i.values():
+        for tf in tf_list:
+            if tf.content == content:
+                return tf.path
+    return None
+
+
 def _build_operations(state: _GeneratorState) -> dict[str, list[dict[str, object]]]:
     """Derive edit operations between consecutive snapshot pairs."""
     operations: dict[str, list[dict[str, object]]] = {}
@@ -288,19 +300,31 @@ def _build_operations(state: _GeneratorState) -> dict[str, list[dict[str, object
 
         ops: list[dict[str, object]] = []
 
-        files_i = {tf.file_id: tf for tf in state.snapshots[i].files.values()}
-        files_j = {
-            tf.file_id: tf for tf in state.snapshots[i + 1].files.values()
-        }
+        # Build multi-path dicts: file_id -> list[_TrackedFile]
+        # Supports copies (same file_id at multiple paths in one snapshot)
+        files_i: dict[str, list[_TrackedFile]] = {}
+        for tf in state.snapshots[i].files.values():
+            files_i.setdefault(tf.file_id, []).append(tf)
+        files_j: dict[str, list[_TrackedFile]] = {}
+        for tf in state.snapshots[i + 1].files.values():
+            files_j.setdefault(tf.file_id, []).append(tf)
 
         ids_i = set(files_i.keys())
         ids_j = set(files_j.keys())
 
-        # Same file_id in both snapshots
+        # Same file_id appears in both snapshots
         for fid in ids_i & ids_j:
-            tf_i = files_i[fid]
-            tf_j = files_j[fid]
-            if tf_i.path == tf_j.path:
+            paths_i = {tf.path for tf in files_i[fid]}
+            paths_j = {tf.path for tf in files_j[fid]}
+
+            shared = paths_i & paths_j
+            removed = paths_i - paths_j
+            added = paths_j - paths_i
+
+            # Shared paths: modify if content changed, no-op otherwise
+            for path in shared:
+                tf_i = next(t for t in files_i[fid] if t.path == path)
+                tf_j = next(t for t in files_j[fid] if t.path == path)
                 if tf_i.content != tf_j.content:
                     ops.append({  # type: ignore[reportUnknownMemberType]
                         "op_type": "modify",
@@ -309,36 +333,77 @@ def _build_operations(state: _GeneratorState) -> dict[str, list[dict[str, object
                         "target_path": tf_j.path,
                         "confidence": 1.0,
                     })
-            else:
+
+            # Track rename sources to avoid double-emitting deletes
+            rename_sources: set[str] = set()
+
+            # Added paths: determine if rename, copy, or create
+            for path in added:
+                tf_j = next(t for t in files_j[fid] if t.path == path)
+
+                # Classic rename: file_id moved to a single new path
+                if not shared and len(paths_i) == 1 and len(paths_j) == 1:
+                    source_path = next(iter(removed))
+                    ops.append({  # type: ignore[reportUnknownMemberType]
+                        "op_type": "rename",
+                        "file_id": fid,
+                        "source_path": source_path,
+                        "target_path": path,
+                        "confidence": 1.0,
+                    })
+                    rename_sources.add(source_path)
+                else:
+                    source_path = _find_source_content(files_i, tf_j.content)
+                    if source_path:
+                        ops.append({  # type: ignore[reportUnknownMemberType]
+                            "op_type": "copy",
+                            "file_id": fid,
+                            "source_path": source_path,
+                            "target_path": path,
+                            "confidence": 1.0,
+                        })
+                    else:
+                        ops.append({  # type: ignore[reportUnknownMemberType]
+                            "op_type": "create",
+                            "file_id": fid,
+                            "source_path": None,
+                            "target_path": path,
+                            "confidence": 1.0,
+                        })
+
+            # Removed paths: delete if not already handled as rename
+            for path in removed:
+                if path not in rename_sources:
+                    tf_i = next(t for t in files_i[fid] if t.path == path)
+                    ops.append({  # type: ignore[reportUnknownMemberType]
+                        "op_type": "delete",
+                        "file_id": fid,
+                        "source_path": tf_i.path,
+                        "target_path": None,
+                        "confidence": 1.0,
+                    })
+
+        # Deleted files: file_id entirely absent in S_j
+        for fid in ids_i - ids_j:
+            for tf in files_i[fid]:
                 ops.append({  # type: ignore[reportUnknownMemberType]
-                    "op_type": "rename",
+                    "op_type": "delete",
                     "file_id": fid,
-                    "source_path": tf_i.path,
-                    "target_path": tf_j.path,
+                    "source_path": tf.path,
+                    "target_path": None,
                     "confidence": 1.0,
                 })
 
-        # Deleted files
-        for fid in ids_i - ids_j:
-            tf = files_i[fid]
-            ops.append({  # type: ignore[reportUnknownMemberType]
-                "op_type": "delete",
-                "file_id": fid,
-                "source_path": tf.path,
-                "target_path": None,
-                "confidence": 1.0,
-            })
-
-        # Created files
+        # Created files: file_id entirely new in S_j
         for fid in ids_j - ids_i:
-            tf = files_j[fid]
-            ops.append({  # type: ignore[reportUnknownMemberType]
-                "op_type": "create",
-                "file_id": fid,
-                "source_path": None,
-                "target_path": tf.path,
-                "confidence": 1.0,
-            })
+            for tf in files_j[fid]:
+                ops.append({  # type: ignore[reportUnknownMemberType]
+                    "op_type": "create",
+                    "file_id": fid,
+                    "source_path": None,
+                    "target_path": tf.path,
+                    "confidence": 1.0,
+                })
 
         operations[key] = ops
     return operations

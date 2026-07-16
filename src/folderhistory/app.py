@@ -13,6 +13,7 @@ from typing import cast
 import typer
 
 from folderhistory.core.diff import derive_operations
+from folderhistory.core.dir_align import build_inverted_index, resolve_project_identities
 from folderhistory.core.identity import assign_identities_exact
 from folderhistory.core.ingest import ingest_manifest, ingest_snapshot
 from folderhistory.core.timeline import Timeline, TimelineNode, build_timeline
@@ -20,7 +21,7 @@ from folderhistory.io.output import format_gitlog, format_json, format_jsonlines
 from folderhistory.knowledge.json_kb import JSONKnowledgeBase
 from folderhistory.knowledge.types import VersionMeta
 from folderhistory.knowledge.update import compute_igs
-from folderhistory.types import EditOperation, Snapshot
+from folderhistory.types import EditOperation, IdentityCluster, Snapshot
 
 
 app = typer.Typer(
@@ -185,7 +186,25 @@ def analyze(
         raise typer.Exit(code=1)
 
     snapshots = [ingest_snapshot(d) for d in snapshot_dirs]
-    identities = assign_identities_exact(snapshots, kb=kb)
+
+    # Group snapshots by project
+    inverted_index = build_inverted_index(snapshots)
+    project_groups = resolve_project_identities(
+        snapshots, inverted_index, kb=kb, mode=mode,
+    )
+
+    # Run identity per project group
+    all_identities: dict[str, IdentityCluster] = {}
+    for project_uid, snap_ids in project_groups.items():
+        group_snaps = [s for s in snapshots if s.id in snap_ids]
+        if not group_snaps:
+            continue
+        group_identities = assign_identities_exact(
+            group_snaps, kb=kb, project_uid=project_uid,
+        )
+        all_identities.update(group_identities)
+
+    identities = all_identities
     operations = derive_operations(snapshots, identities)
     timeline = build_timeline(snapshots, operations)
     output_text = _format_timeline(timeline, output_format)

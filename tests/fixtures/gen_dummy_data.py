@@ -22,12 +22,14 @@ import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+
+import blake3
+import orjson
+import xxhash
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-from typing import cast
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -164,6 +166,66 @@ def _write_file(
     _ = os.utime(full_path, ns=(mtime_ns, mtime_ns))
     _ = full_path.chmod(mode)
     return full_path
+
+
+# ── Manifest generation helpers ────────────────────────────────────────────────
+
+
+def _detect_line_ending(content: bytes) -> str:
+    """Detect line endings: crlf, lf, mixed, binary, unknown."""
+    if b"\x00" in content[:512]:
+        return "binary"
+    crlf_count = content.count(b"\r\n")
+    lf_count = content.count(b"\n") - crlf_count
+    if crlf_count > 0 and lf_count > 0:
+        return "mixed"
+    if crlf_count > 0:
+        return "crlf"
+    if lf_count > 0:
+        return "lf"
+    return "unknown"
+
+
+def _write_manifests(state: _GeneratorState, output_dir: Path) -> None:
+    """Write JSON manifests for all snapshots.
+
+    Produces ``manifests/S{name}.json`` files consumable by
+    ``ingest_manifest()``.  Each manifest mirrors the ``Snapshot``
+    structure with real BLAKE3, xxHash64 hashes and line-ending detection.
+    """
+    manifests_dir = output_dir / "manifests"
+    manifests_dir.mkdir(parents=True, exist_ok=True)
+    for i, snap_state in enumerate(state.snapshots):
+        name = state.snapshot_names[i]
+        manifest = {
+            "id": name,
+            "timestamp": state.timestamps[i],
+            "source_path": str(output_dir / name),
+            "files": [
+                {
+                    "path": tf.path,
+                    "size": len(tf.content),
+                    "mode": tf.mode,
+                    "mtime_ns": tf.mtime_ns,
+                    "ctime_ns": tf.ctime_ns,
+                    "raw_blake3": blake3.blake3(tf.content).hexdigest(),
+                    "normalized_blake3": (
+                        blake3.blake3(tf.content.replace(b"\r\n", b"\n")).hexdigest()
+                        if b"\x00" not in tf.content[:512]
+                        else None
+                    ),
+                    "line_ending": _detect_line_ending(tf.content),
+                    "xxhash64": xxhash.xxh64(tf.content).hexdigest(),
+                    "is_symlink": tf.is_symlink,
+                    "target_path": tf.target_path,
+                }
+                for tf in snap_state.files.values()
+            ],
+        }
+        manifest_path = manifests_dir / f"{name}.json"
+        _ = manifest_path.write_bytes(
+            orjson.dumps(manifest, option=orjson.OPT_INDENT_2),
+        )
 
 
 # ── Ground truth derivation (private helpers) ────────────────────────────────
@@ -978,7 +1040,8 @@ def generate(
     output_dir:
         Destination directory for generated fixture tree.
     manifests:
-        If True, write a .manifest.json in each snapshot directory.
+        If True, write ``manifests/S{name}.json`` files consumable by
+        ``ingest_manifest()``.
 
     Returns
     -------
@@ -1016,20 +1079,9 @@ def generate(
                 snap_dir, path, tf.content, tf.mtime_ns, tf.ctime_ns, tf.mode,
             )
 
-        # Optional per-snapshot manifest
-        if manifests:
-            manifest: dict[str, dict[str, object]] = {}
-            for path, tf in snap.files.items():
-                manifest[path] = {
-                    "file_id": tf.file_id,
-                    "size": len(tf.content),
-                    "mtime_ns": tf.mtime_ns,
-                    "ctime_ns": tf.ctime_ns,
-                    "mode": tf.mode,
-                }
-            _ = (snap_dir / ".manifest.json").write_text(
-                json.dumps(manifest, indent=2),
-            )
+    # Write manifests (after all snapshots are written)
+    if manifests:
+        _write_manifests(state, output_dir)
 
     # Write ground truth
     ground_truth: dict[str, object] = _derive_ground_truth(state)
@@ -1081,7 +1133,7 @@ def main() -> None:
         "--manifests",
         "-m",
         action="store_true",
-        help="Write .manifest.json in each snapshot directory",
+        help="Write manifests/S{name}.json files consumable by ingest_manifest()",
     )
     _ = parser.add_argument(
         "--list-scenarios",

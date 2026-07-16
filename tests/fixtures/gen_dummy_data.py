@@ -39,6 +39,7 @@ SCENARIO_DEFAULTS: dict[str, int] = {
     "branching": 4,
     "flash-drive-chain": 4,
     "corruption-mix": 6,
+    "photo-curation": 7,
 }
 
 _NS_IN_SEC = 1_000_000_000
@@ -252,12 +253,17 @@ def _build_snapshot_info(state: _GeneratorState) -> list[dict[str, str | float]]
 def _build_identity_clusters(state: _GeneratorState) -> list[dict[str, object]]:
     """Build identity clusters from file_id observations across snapshots."""
     file_id_observations: dict[str, list[tuple[str, str]]] = {}
+    curated_observations: dict[str, list[tuple[str, str]]] = {}
     for i, snap in enumerate(state.snapshots):
         snap_id = state.snapshot_names[i]
         for path, tf in snap.files.items():
             file_id_observations.setdefault(tf.file_id, []).append(
                 (snap_id, path),
             )
+            if tf.curation_status == "curated":
+                curated_observations.setdefault(tf.file_id, []).append(
+                    (snap_id, path),
+                )
 
     clusters: list[dict[str, object]] = []
     for fid, observations in file_id_observations.items():
@@ -269,12 +275,15 @@ def _build_identity_clusters(state: _GeneratorState) -> list[dict[str, object]]:
             if path_counts
             else None
         )
-        clusters.append({  # type: ignore[reportUnknownMemberType]
+        cluster: dict[str, object] = {  # type: ignore[reportUnknownMemberType]
             "uid": fid,
             "observations": observations,
             "canonical_path": canonical,
             "confidence": 1.0,
-        })
+        }
+        if fid in curated_observations:
+            cluster["curated_observations"] = curated_observations[fid]
+        clusters.append(cluster)
     return clusters
 
 
@@ -429,6 +438,8 @@ def _build_files_metadata(state: _GeneratorState) -> dict[str, dict[str, object]
                 ),
                 "line_ending": le,
                 "is_symlink": tf.is_symlink,
+                "project_uid": tf.project_uid,
+                "curation_status": tf.curation_status,
             }
         meta[snap_id] = snap_files
     return meta
@@ -446,6 +457,7 @@ def _derive_ground_truth(state: _GeneratorState) -> dict[str, object]:
         "expected_operations": _build_operations(state),
         "identity_clusters": _build_identity_clusters(state),
         "files": _build_files_metadata(state),
+        "project_roots": state.project_roots,
     }
 
 
@@ -1073,6 +1085,223 @@ def _generate_corruption_mix(
     return state
 
 
+# ── Photo curation generator ─────────────────────────────────────────────────
+
+
+def _generate_photo_curation(
+    num_snapshots: int,
+    seed: int,
+) -> _GeneratorState:
+    """Photo backup workflow with import, curation, and album creation.
+
+    Simulates a photo backup where files are imported into date-named
+    folders, then cherry-picked into category albums with curated copies
+    and original deletions.
+
+    Snapshot timeline (7 snapshots, 14 logical files A-N):
+      S0: Import 4 photos into 2024-03-15/          [A, B, C, D]
+      S1: Import 2 more into 2024-04-20/             [+E, F]
+      S2: Import 2 more into 2024-05-10/             [+G, H]
+      S3: Create hotrod pics/, copy A,C,E,G into it  [+curated copies]
+      S4: Import 4 more into 2024-06-01/             [+I, J, K, L]
+      S5: Delete originals A,C,E,G from dated        [curated copies remain]
+      S6: Create track day pics/, copy J,L, del ori  [+M, N (new)]
+    """
+    state = _GeneratorState()
+    state.seed = seed
+    state.scenario = "photo-curation"
+    state.snapshot_names = [f"S{i}" for i in range(num_snapshots)]
+    baseline = 1700000000.0
+    state.timestamps = [
+        _compute_timestamp(baseline, i, seed) for i in range(num_snapshots)
+    ]
+    state.source_paths = None  # single location
+    state.project_roots = {"photo-library": ""}
+
+    # ── Logical file IDs (14 files: A-N) ──────────────────────────────────
+    fid_a = _make_fid("photo_A", seed)
+    fid_b = _make_fid("photo_B", seed)
+    fid_c = _make_fid("photo_C", seed)
+    fid_d = _make_fid("photo_D", seed)
+    fid_e = _make_fid("photo_E", seed)
+    fid_f = _make_fid("photo_F", seed)
+    fid_g = _make_fid("photo_G", seed)
+    fid_h = _make_fid("photo_H", seed)
+    fid_i = _make_fid("photo_I", seed)
+    fid_j = _make_fid("photo_J", seed)
+    fid_k = _make_fid("photo_K", seed)
+    fid_l = _make_fid("photo_L", seed)
+    fid_m = _make_fid("photo_M", seed)
+    fid_n = _make_fid("photo_N", seed)
+
+    # ── File paths (date-named folders, HHMMSS filenames) ─────────────────
+    paths: dict[str, str] = {
+        "A": "2024-03-15/143022.jpg",
+        "B": "2024-03-15/153045.jpg",
+        "C": "2024-03-15/161508.jpg",
+        "D": "2024-03-15/173531.jpg",
+        "E": "2024-04-20/092315.jpg",
+        "F": "2024-04-20/103338.jpg",
+        "G": "2024-05-10/114401.jpg",
+        "H": "2024-05-10/130424.jpg",
+        "I": "2024-06-01/140447.jpg",
+        "J": "2024-06-01/150510.jpg",
+        "K": "2024-06-01/160533.jpg",
+        "L": "2024-06-01/170556.jpg",
+        "M": "2024-07-04/080101.jpg",
+        "N": "2024-07-04/091515.jpg",
+    }
+
+    fids: dict[str, str] = {
+        "A": fid_a, "B": fid_b, "C": fid_c, "D": fid_d,
+        "E": fid_e, "F": fid_f, "G": fid_g, "H": fid_h,
+        "I": fid_i, "J": fid_j, "K": fid_k, "L": fid_l,
+        "M": fid_m, "N": fid_n,
+    }
+
+    hotrod_prefix = "hotrod pics/"
+    track_prefix = "track day pics/"
+
+    # Pre-compute content for each logical file (version 0 — never modified)
+    content: dict[str, bytes] = {}
+    for label, path in paths.items():
+        content[label] = _make_content(path, 0, seed)
+
+    def _tf(
+        label: str,
+        path: str,
+        ts_ns: int,
+        *,
+        curation_status: str | None = None,
+    ) -> _TrackedFile:
+        """Build a TrackedFile for a photo label."""
+        return _TrackedFile(
+            file_id=fids[label],
+            path=path,
+            content=content[label],
+            mtime_ns=ts_ns,
+            ctime_ns=ts_ns,
+            mode=0o644,
+            project_uid="photo-library",
+            curation_status=curation_status,
+        )
+
+    def _curated_path(label: str, prefix: str) -> str:
+        """Album path for a photo (basename only, in album folder)."""
+        fname = paths[label].split("/")[1]
+        return f"{prefix}{fname}"
+
+    ts = [int(state.timestamps[i] * _NS_IN_SEC) for i in range(num_snapshots)]
+
+    # ── S0: Import 4 photos into 2024-03-15/ ──────────────────────────────
+    snap0 = _SnapshotState()
+    for label in ("A", "B", "C", "D"):
+        snap0.add_file(_tf(label, paths[label], ts[0]))
+    state.snapshots.append(snap0)
+    if num_snapshots < 2:
+        return state
+
+    # ── S1: Import 2 more into 2024-04-20/ ────────────────────────────────
+    snap1 = _SnapshotState()
+    for label in ("A", "B", "C", "D"):
+        snap1.add_file(_tf(label, paths[label], ts[1]))
+    for label in ("E", "F"):
+        snap1.add_file(_tf(label, paths[label], ts[1]))
+    state.snapshots.append(snap1)
+    if num_snapshots < 3:
+        return state
+
+    # ── S2: Import 2 more into 2024-05-10/ ────────────────────────────────
+    snap2 = _SnapshotState()
+    for label in ("A", "B", "C", "D", "E", "F"):
+        snap2.add_file(_tf(label, paths[label], ts[2]))
+    for label in ("G", "H"):
+        snap2.add_file(_tf(label, paths[label], ts[2]))
+    state.snapshots.append(snap2)
+    if num_snapshots < 4:
+        return state
+
+    # ── S3: Create hotrod pics/, copy A, C, E, G into it ──────────────────
+    snap3 = _SnapshotState()
+    for label in ("A", "B", "C", "D", "E", "F", "G", "H"):
+        curation = "original" if label in ("A", "C", "E", "G") else None
+        snap3.add_file(
+            _tf(label, paths[label], ts[3], curation_status=curation),
+        )
+    for label in ("A", "C", "E", "G"):
+        snap3.add_file(
+            _tf(
+                label, _curated_path(label, hotrod_prefix), ts[3],
+                curation_status="curated",
+            ),
+        )
+    state.snapshots.append(snap3)
+    if num_snapshots < 5:
+        return state
+
+    # ── S4: Import 4 more into 2024-06-01/ ────────────────────────────────
+    snap4 = _SnapshotState()
+    for label in ("A", "B", "C", "D", "E", "F", "G", "H"):
+        curation = "original" if label in ("A", "C", "E", "G") else None
+        snap4.add_file(
+            _tf(label, paths[label], ts[4], curation_status=curation),
+        )
+    for label in ("A", "C", "E", "G"):
+        snap4.add_file(
+            _tf(
+                label, _curated_path(label, hotrod_prefix), ts[4],
+                curation_status="curated",
+            ),
+        )
+    for label in ("I", "J", "K", "L"):
+        snap4.add_file(_tf(label, paths[label], ts[4]))
+    state.snapshots.append(snap4)
+    if num_snapshots < 6:
+        return state
+
+    # ── S5: Delete originals A, C, E, G from dated folders ────────────────
+    snap5 = _SnapshotState()
+    for label in ("A", "C", "E", "G"):
+        snap5.add_file(
+            _tf(
+                label, _curated_path(label, hotrod_prefix), ts[5],
+                curation_status="curated",
+            ),
+        )
+    for label in ("B", "D", "F", "H"):
+        snap5.add_file(_tf(label, paths[label], ts[5]))
+    for label in ("I", "J", "K", "L"):
+        snap5.add_file(_tf(label, paths[label], ts[5]))
+    state.snapshots.append(snap5)
+    if num_snapshots < 7:
+        return state
+
+    # ── S6: Create track day pics/, copy J,L. Delete J,L from dated +MM,NN─
+    snap6 = _SnapshotState()
+    for label in ("A", "C", "E", "G"):
+        snap6.add_file(
+            _tf(
+                label, _curated_path(label, hotrod_prefix), ts[6],
+                curation_status="curated",
+            ),
+        )
+    for label in ("B", "D", "F", "H"):
+        snap6.add_file(_tf(label, paths[label], ts[6]))
+    for label in ("I", "K"):
+        snap6.add_file(_tf(label, paths[label], ts[6]))
+    for label in ("J", "L"):
+        snap6.add_file(
+            _tf(
+                label, _curated_path(label, track_prefix), ts[6],
+                curation_status="curated",
+            ),
+        )
+    for label in ("M", "N"):
+        snap6.add_file(_tf(label, paths[label], ts[6]))
+    state.snapshots.append(snap6)
+    return state
+
+
 # ── Scenario dispatcher ──────────────────────────────────────────────────────
 
 _GENERATORS: dict[str, Callable[[int, int], _GeneratorState]] = {
@@ -1081,6 +1310,7 @@ _GENERATORS: dict[str, Callable[[int, int], _GeneratorState]] = {
     "branching": _generate_branching,
     "flash-drive-chain": _generate_flash_drive_chain,
     "corruption-mix": _generate_corruption_mix,
+    "photo-curation": _generate_photo_curation,
 }
 
 

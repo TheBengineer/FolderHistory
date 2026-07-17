@@ -141,8 +141,8 @@ def analyze(
         "-r",
         help="Recursively discover snapshots in subdirectories",
     ),
-    max_depth: int = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
-        1,
+    max_depth: int | None = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        None,
         "--max-depth",
         "-d",
         help="Maximum directory depth for recursive discovery (default: 1, -1 = infinite)",
@@ -156,8 +156,6 @@ def analyze(
     If --mode delta: only process unmatched hashes via KB.
     If --mode auto (default): auto-detect based on KB state.
     """
-    _ = recursive, max_depth  # wired in Task 4
-
     snapshots_dir_resolved = snapshots_dir.resolve()
 
     # ── KB initialisation ──────────────────────────────────────────────
@@ -189,17 +187,32 @@ def analyze(
             kb = None
 
     # ── Snapshot processing ────────────────────────────────────────────
-    snapshot_dirs = sorted(
-        [d for d in snapshots_dir_resolved.iterdir() if d.is_dir()],
-    )
-    if not snapshot_dirs:
+    from folderhistory.core.discovery import discover_snapshots
+
+    # Determine effective depth:
+    #   --recursive without --max-depth → infinite (-1)
+    #   --max-depth N → N
+    #   default (no flags) → 1 (flat)
+    if recursive and max_depth is None:
+        effective_depth = -1
+    elif max_depth is not None:
+        effective_depth = max_depth
+    else:
+        effective_depth = 1
+
+    discovered = discover_snapshots(snapshots_dir_resolved, max_depth=effective_depth)
+    if not discovered:
         typer.echo(
-            f"No snapshot directories found in {snapshots_dir_resolved}",
+            "No snapshot directories found",
             err=True,
         )
         raise typer.Exit(code=1)
 
-    snapshots = [ingest_snapshot(d) for d in snapshot_dirs]
+    snapshots: list[Snapshot] = []
+    for sd in discovered:
+        s = ingest_snapshot(sd.path, snapshot_id=sd.relative_id)
+        snapshots.append(s)
+    snapshots.sort(key=lambda s: s.id)
 
     # Group snapshots by project
     inverted_index = build_inverted_index(snapshots)

@@ -135,6 +135,18 @@ def analyze(
         "--kb-path",
         help="Custom KB file path",
     ),
+    recursive: bool = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--recursive",
+        "-r",
+        help="Recursively discover snapshots in subdirectories",
+    ),
+    max_depth: int = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        1,
+        "--max-depth",
+        "-d",
+        help="Maximum directory depth for recursive discovery (default: 1, -1 = infinite)",
+    ),
 ) -> None:
     """Analyze snapshots and reconstruct folder history.
 
@@ -144,6 +156,8 @@ def analyze(
     If --mode delta: only process unmatched hashes via KB.
     If --mode auto (default): auto-detect based on KB state.
     """
+    _ = recursive, max_depth  # wired in Task 4
+
     snapshots_dir_resolved = snapshots_dir.resolve()
 
     # ── KB initialisation ──────────────────────────────────────────────

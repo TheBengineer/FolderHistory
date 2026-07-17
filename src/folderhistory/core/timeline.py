@@ -49,6 +49,71 @@ class Timeline:
     nodes: list[TimelineNode] = field(default_factory=list)
     root_changes: list[dict[str, str]] = field(default_factory=list)
 
+    def filter_by_subtree(self, prefix: str) -> Timeline:
+        """Return a new Timeline showing only operations under the given path prefix.
+
+        Paths in the filtered timeline have the prefix stripped (rebased).
+        All snapshot nodes are preserved; nodes with no matching operations
+        will have an empty operations list.
+
+        Parameters
+        ----------
+        prefix:
+            Path prefix to filter by.  All operations whose ``source_path``
+            or ``target_path`` starts with this prefix are kept; their paths
+            are rebased by removing the prefix.
+
+        Returns
+        -------
+        A new :class:`Timeline` with the same node structure but only
+        matching operations, with rebased paths.
+        """
+        if not prefix or prefix == ".":
+            return self
+
+        norm_prefix = prefix.rstrip("/") + "/"
+
+        new_nodes: list[TimelineNode] = []
+        for node in self.nodes:
+            filtered_ops: list[EditOperation] = []
+            for op in node.operations:
+                source = op.source_path or ""
+                target = op.target_path or ""
+
+                source_match = source.startswith(norm_prefix)
+                target_match = target.startswith(norm_prefix)
+
+                if not source_match and not target_match:
+                    continue
+
+                new_source = source[len(norm_prefix) :] if source_match else op.source_path
+                new_target = target[len(norm_prefix) :] if target_match else op.target_path
+
+                filtered_ops.append(
+                    EditOperation(
+                        op_type=op.op_type,
+                        file_id=op.file_id,
+                        source_path=new_source,
+                        target_path=new_target,
+                        old_hash=op.old_hash,
+                        new_hash=op.new_hash,
+                        confidence=op.confidence,
+                    ),
+                )
+
+            new_nodes.append(
+                TimelineNode(
+                    snapshot_id=node.snapshot_id,
+                    operations=filtered_ops,
+                    parent_id=node.parent_id,
+                    root_change=node.root_change,
+                    timestamp=node.timestamp,
+                    source_path=node.source_path,
+                ),
+            )
+
+        return Timeline(nodes=new_nodes)
+
 
 # ── Core construction ──────────────────────────────────────────────────────────
 

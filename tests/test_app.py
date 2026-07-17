@@ -239,3 +239,139 @@ class TestAnalyzeKbRollback:
         )
         assert result.exit_code == 1
         assert "KB rollback failed" in result.stderr
+
+
+# ── analyze --recursive / --max-depth ─────────────────────────────────────────
+
+
+class TestAnalyzeRecursive:
+    """Recursive snapshot discovery via ``--recursive`` and ``--max-depth`` flags."""
+
+    def test_flat_mode_backward_compatible(self, tmp_path: Path) -> None:
+        """Without any flags, ``analyze`` discovers only immediate subdirectories (flat mode)."""
+        (tmp_path / "v1").mkdir()
+        _ = (tmp_path / "v1" / "f.txt").write_text("data")
+        (tmp_path / "v2").mkdir()
+        _ = (tmp_path / "v2" / "f.txt").write_text("data")
+
+        out = tmp_path / "out.json"
+        result = runner.invoke(app, ["analyze", str(tmp_path), "--out", str(out)])
+        assert result.exit_code == 0
+        assert out.exists()
+
+        import typing
+        import orjson
+
+        raw = typing.cast("dict[str, object]", orjson.loads(out.read_bytes()))
+        raw_nodes = typing.cast("list[object]", raw.get("nodes", []))
+        assert len(raw_nodes) == 2
+        node_ids = {
+            typing.cast("str", typing.cast("dict[str, object]", n)["snapshot_id"])
+            for n in raw_nodes
+        }
+        assert node_ids == {"v1", "v2"}
+
+    def test_recursive_discovers_nested(self, tmp_path: Path) -> None:
+        """``--recursive`` discovers snapshots inside nested subdirectories."""
+        proj_v1 = tmp_path / "project_v1"
+        proj_v1.mkdir()
+        _ = (proj_v1 / "file.txt").write_text("data")
+
+        proj_v0 = tmp_path / "archive" / "project_v0"
+        proj_v0.mkdir(parents=True)
+        _ = (proj_v0 / "old.txt").write_text("data")
+
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app, ["analyze", str(tmp_path), "--recursive", "--out", str(out)],
+        )
+        assert result.exit_code == 0
+        assert out.exists()
+
+        import typing
+        import orjson
+
+        raw = typing.cast("dict[str, object]", orjson.loads(out.read_bytes()))
+        raw_nodes = typing.cast("list[object]", raw.get("nodes", []))
+        snapshot_ids = {
+            typing.cast("str", typing.cast("dict[str, object]", n)["snapshot_id"])
+            for n in raw_nodes
+        }
+        assert snapshot_ids == {"project_v1", "archive/project_v0"}
+
+    def test_max_depth_limits(self, tmp_path: Path) -> None:
+        """``--max-depth 1`` uses flat discovery, returning all immediate subdirs."""
+        proj_v1 = tmp_path / "project_v1"
+        proj_v1.mkdir()
+        _ = (proj_v1 / "file.txt").write_text("data")
+
+        archive = tmp_path / "archive" / "deep"
+        archive.mkdir(parents=True)
+        _ = (archive / "old.txt").write_text("data")
+
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            [
+                "analyze", str(tmp_path),
+                "--recursive", "--max-depth", "1",
+                "--out", str(out),
+            ],
+        )
+        assert result.exit_code == 0
+        assert out.exists()
+
+        import typing
+        import orjson
+
+        raw = typing.cast("dict[str, object]", orjson.loads(out.read_bytes()))
+        raw_nodes = typing.cast("list[object]", raw.get("nodes", []))
+        snapshot_ids = {
+            typing.cast("str", typing.cast("dict[str, object]", n)["snapshot_id"])
+            for n in raw_nodes
+        }
+        # max-depth=1 is flat mode — returns all immediate subdirs including containers
+        assert snapshot_ids == {"archive", "project_v1"}
+
+    def test_recursive_produces_valid_timeline(self, tmp_path: Path) -> None:
+        """Full analyze pipeline with ``--recursive`` produces valid JSON timeline."""
+        proj_v1 = tmp_path / "project_v1"
+        proj_v1.mkdir()
+        _ = (proj_v1 / "file.txt").write_text("data")
+
+        proj_v0 = tmp_path / "archive" / "project_v0"
+        proj_v0.mkdir(parents=True)
+        _ = (proj_v0 / "old.txt").write_text("data")
+
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app, ["analyze", str(tmp_path), "--recursive", "--out", str(out)],
+        )
+        assert result.exit_code == 0
+        assert out.exists()
+
+        import typing
+        import orjson
+
+        raw = typing.cast("dict[str, object]", orjson.loads(out.read_bytes()))
+        raw_nodes = typing.cast("list[object]", raw.get("nodes", []))
+        assert len(raw_nodes) == 2
+        node_ids = {
+            typing.cast("str", typing.cast("dict[str, object]", n)["snapshot_id"])
+            for n in raw_nodes
+        }
+        assert "project_v1" in node_ids
+        assert "archive/project_v0" in node_ids
+        for raw_node in raw_nodes:
+            node = typing.cast("dict[str, object]", raw_node)
+            sid = typing.cast("str", node["snapshot_id"])
+            assert isinstance(sid, str) and sid
+            ops = typing.cast("list[object]", node.get("operations", []))
+            assert isinstance(ops, list)
+
+    def test_recursive_no_snapshots(self, tmp_path: Path) -> None:
+        """``--recursive`` on a tree with no snapshots reports an appropriate error."""
+        (tmp_path / "empty_sub" / "deeper").mkdir(parents=True)
+        result = runner.invoke(app, ["analyze", str(tmp_path), "--recursive"])
+        assert result.exit_code == 1
+        assert "No snapshot directories found" in result.stderr

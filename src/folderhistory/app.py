@@ -299,11 +299,18 @@ def log(
         dir_okay=False,
         readable=True,
     ),
+    subtree: str | None = typer.Option(  # type: ignore  [reportCallInDefaultInitializer]
+        None,
+        "--subtree",
+        help="Show only operations under this path prefix, with rebased paths",
+    ),
 ) -> None:
     import orjson
 
     raw = cast("dict[str, object]", orjson.loads(manifest.read_bytes()))
     timeline = _parse_timeline_json(raw)
+    if subtree:
+        timeline = timeline.filter_by_subtree(subtree)
     _ = typer.echo(format_gitlog(timeline))
 
 

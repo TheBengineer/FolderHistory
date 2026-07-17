@@ -42,6 +42,18 @@ class ContentStore:
                 except PermissionError:
                     continue
 
+    def store_latest_for_project(self, snap: Snapshot, project_root: str) -> None:
+        """Populate Content/<project_root>/ with the full file tree of the latest snapshot."""
+        for fr in snap.files:
+            src = snap.source_path / fr.path
+            if src.exists():
+                dest = self._content_dir / project_root / fr.path
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    shutil.copy2(str(src), str(dest))
+                except PermissionError:
+                    continue
+
     def store_snapshot_file(self, src: Path, rel_path: str) -> None:
         """Copy a single file into Content/ at the given relative path."""
         dest = self._content_dir / rel_path
@@ -49,6 +61,17 @@ class ContentStore:
         try:
             shutil.copy2(str(src), str(dest))
         except PermissionError:
+            pass
+
+    def link_to_project(self, rel_path: str, project_root: str, target: Path) -> None:
+        """Create a symlink to Content/<project_root>/<rel_path> at the target location."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content_target = self._content_dir / project_root / rel_path
+        if not content_target.exists():
+            return
+        try:
+            os.symlink(os.path.relpath(str(content_target), str(target.parent)), str(target))
+        except OSError:
             pass
 
     def link_to(self, rel_path: str, target: Path) -> None:
@@ -150,23 +173,35 @@ def export_working_copy(
         is_latest = node.snapshot_id == latest_id
 
         if is_latest:
-            store.store_latest(snap)
+            # Extract project root from snapshot_id (first path component)
+            proj_root = node.snapshot_id.split("/")[0] if "/" in node.snapshot_id else "."
+            store.store_latest_for_project(snap, proj_root)
             for fr in snap.files:
-                store.link_to(fr.path, sdir / fr.path)
+                store.link_to_project(fr.path, proj_root, sdir / fr.path)
         else:
+            proj_root = node.snapshot_id.split("/")[0] if "/" in node.snapshot_id else None
             for op in node.operations:
                 if op.op_type == "create" and op.new_hash and op.target_path:
                     src = snap.source_path / op.target_path
                     if src.exists():
-                        store.store_snapshot_file(src, op.target_path)
-                        store.link_to(op.target_path, sdir / op.target_path)
+                        if proj_root:
+                            store.store_snapshot_file(src, f"{proj_root}/{op.target_path}")
+                            store.link_to_project(op.target_path, proj_root, sdir / op.target_path)
+                        else:
+                            store.store_snapshot_file(src, op.target_path)
+                            store.link_to(op.target_path, sdir / op.target_path)
                 elif op.op_type == "modify" and op.new_hash and op.source_path:
                     src = snap.source_path / op.source_path
                     if src.exists():
-                        store.store_snapshot_file(src, op.source_path)
-                        store.link_to(op.source_path, sdir / op.source_path)
+                        if proj_root:
+                            store.store_snapshot_file(src, f"{proj_root}/{op.source_path}")
+                            store.link_to_project(op.source_path, proj_root, sdir / op.source_path)
+                        else:
+                            store.store_snapshot_file(src, op.source_path)
+                            store.link_to(op.source_path, sdir / op.source_path)
                 elif op.op_type == "delete" and not exclude_deleted and op.source_path:
-                    content_src = store._content_dir / op.source_path
+                    content_base = store._content_dir / proj_root if proj_root else store._content_dir
+                    content_src = content_base / op.source_path
                     if content_src.exists():
                         dd = sdir / ".fh-deleted"
                         dd.mkdir(parents=True, exist_ok=True)
@@ -180,8 +215,12 @@ def export_working_copy(
                     if op.target_path:
                         src = snap.source_path / op.target_path
                         if src.exists():
-                            store.store_snapshot_file(src, op.target_path)
-                            store.link_to(op.target_path, sdir / op.target_path)
+                            if proj_root:
+                                store.store_snapshot_file(src, f"{proj_root}/{op.target_path}")
+                                store.link_to_project(op.target_path, proj_root, sdir / op.target_path)
+                            else:
+                                store.store_snapshot_file(src, op.target_path)
+                                store.link_to(op.target_path, sdir / op.target_path)
                     if op.source_path:
                         rd = sdir / ".fh-renamed"
                         rd.mkdir(parents=True, exist_ok=True)
@@ -197,9 +236,12 @@ def export_working_copy(
                 elif op.op_type == "copy" and op.new_hash and op.target_path:
                     src = snap.source_path / op.target_path
                     if src.exists():
-                        store.store_snapshot_file(src, op.target_path)
-                        store.link_to(op.target_path, sdir / op.target_path)
-
+                        if proj_root:
+                            store.store_snapshot_file(src, f"{proj_root}/{op.target_path}")
+                            store.link_to_project(op.target_path, proj_root, sdir / op.target_path)
+                        else:
+                            store.store_snapshot_file(src, op.target_path)
+                            store.link_to(op.target_path, sdir / op.target_path)
         _write_changes_file(sdir, node.operations, snap)
 
     if latest_id is not None:
